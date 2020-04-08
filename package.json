@@ -1,0 +1,27 @@
+{
+  "name": "allies-server",
+  "version": "1.0.0",
+  "description": "",
+  "main": "index.js",
+  "scripts": {
+    "build": "webpack -p",
+    "build-d": "webpack -d",
+    "start": "nodemon src/index"
+  },
+  "keywords": [],
+  "author": "",
+  "license": "ISC",
+  "devDependencies": {
+    "eslint": "^6.5.0",
+    "eslint-config-prettier": "^6.3.0",
+    "eslint-plugin-prettier": "^3.1.1",
+    "nodemon": "^1.18.9",
+    "prettier": "^1.18.2"
+  },
+  "dependencies": {
+    "express": "^4.17.1",
+    "express-ws": "^4.0.0",
+    "ip": "^1.1.5",
+    "randomatic": "^3.1.1"
+  }
+}
