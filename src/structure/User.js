@@ -5,6 +5,7 @@ class User {
     const id = randomize('A0', 10);
     this.id = id;
     this.socket = socket;
+    this.name = null;
     this.current_room = null;
   }
 
@@ -14,8 +15,8 @@ class User {
     try {
       const parsed = JSON.stringify({ message, data });
       socket.send(parsed);
-    } catch {
-      console.error('Error parsing socket message.');
+    } catch (e) {
+      console.error('Error parsing socket message.', e.message);
     }
   }
 
@@ -25,13 +26,15 @@ class User {
     const { socket } = this;
 
     socket.on('message', connection => {
+      let data;
       try {
-        const data = JSON.parse(connection);
-        if (data.message !== message) return;
-        callback(data.data);
-      } catch {
-        console.error('Error receiving socket message.');
+        data = JSON.parse(connection);
+      } catch (e) {
+        console.error('Error receiving socket message.', e.message);
       }
+
+      if (data.message !== message) return;
+      callback(data.data);
     });
   }
 }
