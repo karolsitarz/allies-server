@@ -51,16 +51,20 @@ class Vote {
       },
       { maxCount: 0, tally: [], voteCount: 0 }
     );
+    if (!maxCount)
+      return {
+        tally: [],
+        isVoteValid: false,
+      };
+    const validUnanimous = !(this.unanimous && tally.length > 1);
     return {
-      tally: maxCount > 0 ? tally : [],
-      isAllVoted: voteCount === this.voters._length,
+      tally,
+      isVoteValid: voteCount === this.voters._length && validUnanimous,
     };
   }
 
   seal() {
-    const { tally, isAllVoted } = this.getTally();
-    if (!isAllVoted) return;
-    if (this.unanimous && tally.length > 1) return;
+    const { tally } = this.getTally();
     const i = Math.floor(Math.random() * tally.length);
     this.final = tally[i];
     return this.final;
