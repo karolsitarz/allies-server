@@ -11,7 +11,7 @@ class Room {
   }
 
   commAll(message, data) {
-    this.players.forEach(uid => {
+    this.players.forEach((uid) => {
       global.USERS[uid].comm(message, data);
     });
   }
@@ -25,7 +25,7 @@ class Room {
 
   leave(user) {
     if (user.current_room != this.id) return;
-    this.players = this.players.filter(s => s !== user.id);
+    this.players = this.players.filter((s) => s !== user.id);
     user.current_room = null;
     if (!this.players.length) {
       delete global.ROOMS[this.id];
@@ -37,12 +37,12 @@ class Room {
   }
 
   getPlayers() {
-    return this.players.map(id => {
+    return this.players.map((id) => {
       const { name } = global.USERS[id];
       return {
         id,
         name,
-        isHost: this.host === id
+        isHost: this.host === id,
       };
     });
   }

@@ -1,1 +1,1 @@
-module.exports.wait = time => new Promise(res => setTimeout(res, time));
+module.exports.wait = (time) => new Promise((res) => setTimeout(res, time));

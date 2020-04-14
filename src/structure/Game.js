@@ -6,7 +6,7 @@ const Vote = require('./Vote');
 
 const ROLES = {
   MAFIA: 'mafia',
-  CITIZEN: 'citizen'
+  CITIZEN: 'citizen',
 };
 
 class Game {
@@ -16,11 +16,13 @@ class Game {
 
     this.players = roles.reduce((acc, current) => {
       const { count, role } = current;
-      const mapped = shuffled.slice(acc.length, acc.length + count).map(p => ({
-        id: p,
-        role,
-        isDead: false
-      }));
+      const mapped = shuffled
+        .slice(acc.length, acc.length + count)
+        .map((p) => ({
+          id: p,
+          role,
+          isDead: false,
+        }));
       return [...acc, ...mapped];
     }, []);
     shuffleInplace(this.players);
@@ -54,7 +56,7 @@ class Game {
     });
     this.history[this.round][this.current_role] = new Vote(
       this.players,
-      this.players.filter(c => c.role === this.current_role)
+      this.players.filter((c) => c.role === this.current_role)
     );
     this.players.forEach(({ id, role, isDead }) => {
       if (isDead) return;
@@ -78,7 +80,7 @@ class Game {
         isDead,
         name,
         voted: list[id] || [],
-        isMostVoted: tally.includes(id)
+        isMostVoted: tally.includes(id),
       };
     });
     this.players.forEach(({ id, role, isDead }) => {
@@ -91,16 +93,16 @@ class Game {
 
 module.exports = Game;
 
-const generateRoles = count => {
+const generateRoles = (count) => {
   const mafia = Math.round(count / 2);
   return [
     {
       role: ROLES.MAFIA,
-      count: mafia
+      count: mafia,
     },
     {
       role: ROLES.CITIZEN,
-      count: count - mafia
-    }
+      count: count - mafia,
+    },
   ];
 };

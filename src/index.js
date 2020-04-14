@@ -12,7 +12,7 @@ const port = process.env.PORT || 443;
 global.ROOMS = {};
 global.USERS = {};
 
-app.ws('/', socket => {
+app.ws('/', (socket) => {
   const user = new User(socket);
   const { id: uid } = user;
   global.USERS[uid] = user;
@@ -30,7 +30,7 @@ app.ws('/', socket => {
     console.DLog('DISCONNECT', uid);
   });
 
-  user.receive(MSG.LOGIN.PROMPT, name => {
+  user.receive(MSG.LOGIN.PROMPT, (name) => {
     try {
       if (typeof name !== 'string') throw new Error('Name is not a string.');
       if (!name.length) throw new Error('Name is too short.');
@@ -53,7 +53,7 @@ app.ws('/', socket => {
     room.commAll(MSG.ROOM.UPDATE, room.getPlayers());
   });
 
-  user.receive(MSG.ROOM.JOIN, id => {
+  user.receive(MSG.ROOM.JOIN, (id) => {
     const room = global.ROOMS[id];
     if (!room) return;
 
@@ -81,7 +81,7 @@ app.ws('/', socket => {
     room.startGame();
   });
 
-  user.receive(MSG.GAME.ROLE.VOTE, id => {
+  user.receive(MSG.GAME.ROLE.VOTE, (id) => {
     if (!user.current_room) return;
     const room = global.ROOMS[user.current_room];
     if (!room) return;

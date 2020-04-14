@@ -25,7 +25,7 @@ class User {
     if (typeof callback !== 'function') return;
     const { socket } = this;
 
-    socket.on('message', connection => {
+    socket.on('message', (connection) => {
       let data;
       try {
         data = JSON.parse(connection);

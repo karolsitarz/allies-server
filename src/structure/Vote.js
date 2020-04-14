@@ -1,5 +1,5 @@
 class Vote {
-  constructor(list, voters) {
+  constructor(list, voters, unanimous = false) {
     this.voters = voters.reduce((acc, current) => {
       const { id } = current;
       return { ...acc, [id]: null };
@@ -11,6 +11,7 @@ class Vote {
 
     this.voters._length = voters.length;
     this.final = null;
+    this.unanimous = unanimous;
   }
   vote(voter, voteFor) {
     if (!this.final);
@@ -20,7 +21,7 @@ class Vote {
     // remove previous vote
     const lastVote = this.voters[voter];
     if (lastVote) {
-      this.list[lastVote] = this.list[lastVote].filter(el => el !== voter);
+      this.list[lastVote] = this.list[lastVote].filter((el) => el !== voter);
     }
 
     // toggle vote off
@@ -38,7 +39,7 @@ class Vote {
   }
 
   getTally() {
-    const { tally, voteCount } = Object.keys(this.list).reduce(
+    const { tally, voteCount, maxCount } = Object.keys(this.list).reduce(
       (acc, current) => {
         const count = this.list[current].length;
         const { maxCount, tally } = acc;
@@ -51,14 +52,15 @@ class Vote {
       { maxCount: 0, tally: [], voteCount: 0 }
     );
     return {
-      tally,
-      isAllVoted: voteCount === this.voters._length
+      tally: maxCount > 0 ? tally : [],
+      isAllVoted: voteCount === this.voters._length,
     };
   }
 
   seal() {
     const { tally, isAllVoted } = this.getTally();
     if (!isAllVoted) return;
+    if (this.unanimous && tally.length > 1) return;
     const i = Math.floor(Math.random() * tally.length);
     this.final = tally[i];
     return this.final;
