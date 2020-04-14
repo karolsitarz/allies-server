@@ -1,11 +1,13 @@
 const randomize = require('randomatic');
+const Game = require('./Game');
 
 class Room {
   constructor() {
-    const id = randomize('A0', 6);
+    const id = randomize('A', 5);
     this.id = id;
     this.players = [];
     this.host = null;
+    this.game = null;
   }
 
   commAll(message, data) {
@@ -43,6 +45,11 @@ class Room {
         isHost: this.host === id
       };
     });
+  }
+
+  startGame() {
+    this.game = new Game(this.players);
+    this.game.start();
   }
 }
 

@@ -20,16 +20,23 @@ app.ws('/', socket => {
 
   socket.on('close', () => {
     if (uid == null) return;
+    const { current_room } = user;
+    if (current_room) {
+      const room = global.ROOMS[current_room];
+      room.leave(user);
+      room.commAll(MSG.ROOM.UPDATE, room.getPlayers());
+    }
     delete global.USERS[uid];
-    console.DLog('DISCONNECT', socket.id);
+    console.DLog('DISCONNECT', uid);
   });
 
   user.receive(MSG.LOGIN.PROMPT, name => {
     try {
       if (typeof name !== 'string') throw new Error('Name is not a string.');
+      if (!name.length) throw new Error('Name is too short.');
       if (name.length > 20) throw new Error('Name is too long.');
       user.name = name;
-      user.comm(MSG.LOGIN.SUCCESS);
+      user.comm(MSG.LOGIN.SUCCESS, uid);
     } catch (e) {
       user.comm(MSG.LOGIN.FAILURE, e.message);
     }
@@ -42,10 +49,8 @@ app.ws('/', socket => {
 
     room.join(user);
     room.host = uid;
-    user.comm(MSG.ROOM.JOIN, {
-      id,
-      players: room.getPlayers()
-    });
+    user.comm(MSG.ROOM.JOIN, id);
+    room.commAll(MSG.ROOM.UPDATE, room.getPlayers());
   });
 
   user.receive(MSG.ROOM.JOIN, id => {
@@ -53,22 +58,37 @@ app.ws('/', socket => {
     if (!room) return;
 
     room.join(user);
-    user.comm(MSG.ROOM.JOIN, {
-      id,
-      players: room.getPlayers()
-    });
+    user.comm(MSG.ROOM.JOIN, id);
+    room.commAll(MSG.ROOM.UPDATE, room.getPlayers());
   });
 
   user.receive(MSG.ROOM.LEAVE, () => {
-    const id = user.current_room;
-    if (!id) return;
-    const room = global.ROOMS[id];
+    if (!user.current_room) return;
+    const room = global.ROOMS[user.current_room];
     if (!room) return;
 
-    console.log(user.current_room, '\t', id, '\t', global.ROOMS[id]);
     room.leave(user);
-    console.log(user.current_room, '\t', id, '\t', global.ROOMS[id]);
     user.comm(MSG.ROOM.LEAVE);
+    room.commAll(MSG.ROOM.UPDATE, room.getPlayers());
+  });
+
+  user.receive(MSG.GAME.START, () => {
+    if (!user.current_room) return;
+    const room = global.ROOMS[user.current_room];
+    if (!room) return;
+    if (room.host !== user.id) return;
+
+    room.startGame();
+  });
+
+  user.receive(MSG.GAME.ROLE.VOTE, id => {
+    if (!user.current_room) return;
+    const room = global.ROOMS[user.current_room];
+    if (!room) return;
+    const game = room.game;
+    if (!game) return;
+
+    game.vote(user.id, id);
   });
 });
 
