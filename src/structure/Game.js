@@ -82,23 +82,28 @@ class Game {
   }
 
   async nightEnd() {
-    // here will be a function for getting results
+    // TODO: a function for getting results
     const killed = [this.history[this.round][ROLES.MAFIA].final];
+    const killedList = killed.map((id) => ({
+      id,
+      name: global.USERS[id].name,
+    }));
 
+    this.current_role = null;
     this.players = this.players.map((player) => {
       const { id, isDead } = player;
       const isKilled = killed.includes(id);
+      if (!isDead) {
+        global.USERS[id].comm(GAME.NIGHT.END, { isKilled, killedList });
+      }
       return {
         ...player,
         isDead: isDead || isKilled,
       };
     });
 
-    this.current_role = null;
-    this.forEach(({ socket }) => socket.comm(GAME.NIGHT.END));
-
-    // await wait(10000);
-    // this.forEach(({ socket }) => socket.comm(GAME.DAY.START));
+    await wait(5000);
+    this.forEach(({ socket }) => socket.comm(GAME.DAY.START));
   }
 
   vote(voter, voteFor) {
