@@ -76,7 +76,7 @@ class Game {
 
   async nightStart() {
     this.round += 1;
-    this.forEach(({ socket }) => socket.comm(GAME.NIGHT.START));
+    this.forEach(({ socket }) => socket.comm(GAME.SLEEP));
     await wait(5000);
 
     this.roleAction = GAME_ORDER.reduceRight(
@@ -96,7 +96,7 @@ class Game {
       const { name } = global.USERS[id];
       return { id, name, isDead, voted: [] };
     });
-    this.forEach(({ socket }) => socket.comm(GAME.STAGE.START, players));
+    this.forEach(({ socket }) => socket.comm(GAME.WAKE, players));
   }
 
   vote(voter, voteFor) {
@@ -121,7 +121,7 @@ class Game {
     });
 
     this.forEach(({ socket }) =>
-      socket.comm(GAME.STAGE.VOTE, { isVoteValid, players })
+      socket.comm(GAME.VOTE, { isVoteValid, players })
     );
 
     if (this.timeout) {
@@ -140,7 +140,7 @@ class Game {
   }
 
   stageEnd() {
-    this.forEach(({ socket }) => socket.comm(GAME.STAGE.END));
+    this.forEach(({ socket }) => socket.comm(GAME.SLEEP));
     this.roleAction = this.roleAction();
   }
 
@@ -154,12 +154,12 @@ class Game {
 
     killed.forEach((id) => {
       this.players[id].isDead = true;
-      global.USERS[id].comm(GAME.NIGHT.END, { isKilled: true, killedList });
+      global.USERS[id].comm(GAME.SUMMARY, { isKilled: true, killedList });
     });
 
     this.forEach(
       ({ socket }) =>
-        socket.comm(GAME.NIGHT.END, { isKilled: false, killedList }),
+        socket.comm(GAME.SUMMARY, { isKilled: false, killedList }),
       { role: ROLES.EVERYONE }
     );
 
@@ -173,11 +173,11 @@ class Game {
     const { role } = this.players[killed];
     const name = global.USERS[killed].name;
 
-    global.USERS[killed].comm(GAME.NIGHT.END, {
+    global.USERS[killed].comm(GAME.SUMMARY, {
       isKilled: true,
       killedList: [],
     });
-    this.forEach(({ socket }) => socket.comm(GAME.DAY.END, { name, role }));
+    this.forEach(({ socket }) => socket.comm(GAME.REVEAL, { name, role }));
 
     await wait(5000);
     this.nightStart();

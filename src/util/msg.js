@@ -13,19 +13,11 @@ const MSG = {
   GAME: {
     START: 'GAME_START',
     END: 'GAME_END',
-    STAGE: {
-      START: 'STAGE_START',
-      VOTE: 'STAGE_VOTE',
-      END: 'STAGE_END',
-    },
-    NIGHT: {
-      START: 'NIGHT_START',
-      END: 'NIGHT_END',
-    },
-    DAY: {
-      START: 'DAY_START',
-      END: 'DAY_END',
-    },
+    WAKE: 'GAME_WAKE',
+    SLEEP: 'GAME_SLEEP',
+    VOTE: 'GAME_VOTE',
+    SUMMARY: 'GAME_SUMMARY',
+    REVEAL: 'GAME_REVEAL',
   },
 };
 
