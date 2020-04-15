@@ -71,25 +71,25 @@ class Game {
   async start() {
     this.forEach(({ socket, role }) => socket.comm(GAME.START, role));
     await wait(10000);
-    this.nightStart();
+    this.roundStart();
   }
 
-  async nightStart() {
+  async roundStart() {
     this.round += 1;
     this.forEach(({ socket }) => socket.comm(GAME.SLEEP));
     await wait(5000);
 
     this.roleAction = GAME_ORDER.reduceRight(
       (acc, current) => () => {
-        this.stageAction(current);
+        this.wake(current);
         return acc;
       },
-      () => this.nightEnd()
+      () => this.summary()
     );
     this.roleAction = this.roleAction();
   }
 
-  stageAction(role) {
+  wake(role) {
     this.current_role = role;
     this.setCurrentHistory();
     const players = Object.entries(this.players).map(([id, { isDead }]) => {
@@ -133,18 +133,20 @@ class Game {
         voting.seal();
         this.timeout = null;
 
-        if (this.current_role === ROLES.EVERYONE) return this.dayEnd();
-        this.stageEnd();
+        if (this.current_role === ROLES.EVERYONE) return this.reveal();
+        this.sleep();
       }, 5000);
     }
   }
 
-  stageEnd() {
+  async sleep() {
     this.forEach(({ socket }) => socket.comm(GAME.SLEEP));
     this.roleAction = this.roleAction();
+    await wait(5000);
   }
 
-  async nightEnd() {
+  async summary() {
+    await wait(5000);
     // TODO: a function for getting results
     const killed = [this.history[this.round][ROLES.MAFIA].final];
     const killedList = killed.map((id) => ({
@@ -164,10 +166,14 @@ class Game {
     );
 
     await wait(5000);
-    this.stageAction(ROLES.EVERYONE);
+    const result = this.gameResult();
+    if (!result) {
+      return this.wake(ROLES.EVERYONE);
+    }
+    this.forEach(({ socket }) => socket.comm(GAME.END, result));
   }
 
-  async dayEnd() {
+  async reveal() {
     const killed = this.history[this.round][ROLES.EVERYONE].final;
     this.players[killed].isDead = true;
     const { role } = this.players[killed];
@@ -179,8 +185,26 @@ class Game {
     });
     this.forEach(({ socket }) => socket.comm(GAME.REVEAL, { name, role }));
 
+    const result = this.gameResult();
+    if (!result) {
+      await wait(10000);
+      return this.roundStart();
+    }
     await wait(5000);
-    this.nightStart();
+    this.forEach(({ socket }) => socket.comm(GAME.END, result));
+  }
+
+  gameResult() {
+    let mafiaAlive = false;
+    let citizenAlive = false;
+    Object.values(this.players).forEach(({ role, isDead }) => {
+      mafiaAlive = mafiaAlive || (!isDead && role === ROLES.MAFIA);
+      citizenAlive = citizenAlive || (!isDead && role === ROLES.CITIZEN);
+    });
+
+    if (mafiaAlive && citizenAlive) return;
+    if (mafiaAlive && !citizenAlive) return ROLES.MAFIA;
+    if (!mafiaAlive && citizenAlive) return ROLES.CITIZEN;
   }
 }
 

@@ -78,6 +78,7 @@ app.ws('/', (socket) => {
     if (!room) return;
     if (room.host !== user.id) return;
 
+    if (room.players.length < 4) return;
     room.startGame();
   });
 
