@@ -5,6 +5,7 @@ const { wait } = require('../util/async');
 const Vote = require('./Vote');
 
 const ROLES = {
+  EVERYONE: 'everyone',
   MAFIA: 'mafia',
   CITIZEN: 'citizen',
 };
@@ -28,25 +29,19 @@ class Game {
     }, []);
     shuffleInplace(this.players);
 
-    this.current_role = null;
-    this.round = 0;
+    this.current_role = ROLES.EVERYONE;
+    this.round = -1;
     this.history = [];
     this.timeout = null;
 
-    this.roleAction = GAME_ORDER.reduceRight(
-      (acc, current) => () => {
-        this.nightMove(current);
-        return acc;
-      },
-      () => this.nightEnd()
-    );
+    this.roleAction = null;
   }
 
   forEach(callback, { toDead = false, role: toRole = this.current_role } = {}) {
     this.players.forEach((player) => {
       const { id, role, isDead } = player;
       if (!toDead && isDead) return;
-      if (toRole && role !== toRole) return;
+      if (toRole !== ROLES.EVERYONE && role !== toRole) return;
       callback({ ...player, socket: global.USERS[id] });
     });
   }
@@ -57,53 +52,45 @@ class Game {
     if (!this.history[round][current_role]) {
       const alivePlayers = players.filter(({ isDead }) => !isDead);
       const rolePlayers = alivePlayers.filter(
-        ({ role }) => role === current_role
+        ({ role }) => current_role === ROLES.EVERYONE || role === current_role
       );
-      this.history[round][current_role] = new Vote(alivePlayers, rolePlayers);
+      this.history[round][current_role] = new Vote(
+        alivePlayers,
+        rolePlayers,
+        current_role === ROLES.EVERYONE
+      );
     }
   }
 
   async start() {
     this.forEach(({ socket, role }) => socket.comm(GAME.START, role));
     await wait(10000);
+    this.nightStart();
+  }
+
+  async nightStart() {
+    this.round += 1;
     this.forEach(({ socket }) => socket.comm(GAME.NIGHT.START));
     await wait(5000);
+
+    this.roleAction = GAME_ORDER.reduceRight(
+      (acc, current) => () => {
+        this.stageAction(current);
+        return acc;
+      },
+      () => this.nightEnd()
+    );
     this.roleAction = this.roleAction();
   }
 
-  nightMove(role) {
+  stageAction(role) {
     this.current_role = role;
     this.setCurrentHistory();
     const players = this.players.map(({ id, isDead }) => {
       const { name } = global.USERS[id];
       return { id, isDead, name, voted: [] };
     });
-    this.forEach(({ socket }) => socket.comm(GAME.ROLE.START, players));
-  }
-
-  async nightEnd() {
-    // TODO: a function for getting results
-    const killed = [this.history[this.round][ROLES.MAFIA].final];
-    const killedList = killed.map((id) => ({
-      id,
-      name: global.USERS[id].name,
-    }));
-
-    this.current_role = null;
-    this.players = this.players.map((player) => {
-      const { id, isDead } = player;
-      const isKilled = killed.includes(id);
-      if (!isDead) {
-        global.USERS[id].comm(GAME.NIGHT.END, { isKilled, killedList });
-      }
-      return {
-        ...player,
-        isDead: isDead || isKilled,
-      };
-    });
-
-    await wait(5000);
-    this.forEach(({ socket }) => socket.comm(GAME.DAY.START));
+    this.forEach(({ socket }) => socket.comm(GAME.STAGE.START, players));
   }
 
   vote(voter, voteFor) {
@@ -112,7 +99,9 @@ class Game {
     const voting = round[this.current_role];
     if (!voting) return;
 
-    const { tally, isVoteValid } = voting.vote(voter, voteFor);
+    const vote = voting.vote(voter, voteFor);
+    if (!vote) return;
+    const { tally, isVoteValid } = vote;
     const list = voting.getList();
     const players = this.players.map(({ id, isDead }) => {
       const { name } = global.USERS[id];
@@ -126,23 +115,80 @@ class Game {
     });
 
     this.forEach(({ socket }) =>
-      socket.comm(GAME.ROLE.VOTE, { isVoteValid, players })
+      socket.comm(GAME.STAGE.VOTE, { isVoteValid, players })
     );
 
+    if (this.timeout) {
+      clearTimeout(this.timeout);
+      this.timeout = null;
+    }
     if (isVoteValid) {
       this.timeout = setTimeout(() => {
         voting.seal();
         this.timeout = null;
 
-        this.forEach(({ socket }) => socket.comm(GAME.ROLE.END));
-        this.roleAction = this.roleAction();
+        if (this.current_role === ROLES.EVERYONE) return this.dayEnd();
+        this.stageEnd();
       }, 5000);
-      return;
     }
-    if (this.timeout) {
-      clearTimeout(this.timeout);
-      this.timeout = null;
-    }
+  }
+
+  stageEnd() {
+    this.forEach(({ socket }) => socket.comm(GAME.STAGE.END));
+    this.roleAction = this.roleAction();
+  }
+
+  async nightEnd() {
+    // TODO: a function for getting results
+    const killed = [this.history[this.round][ROLES.MAFIA].final];
+    const killedList = killed.map((id) => ({
+      id,
+      name: global.USERS[id].name,
+    }));
+
+    this.players = this.players.map((player) => {
+      const { id, isDead } = player;
+      const isKilled = killed.includes(id);
+      return {
+        ...player,
+        isDead: isDead || isKilled,
+      };
+    });
+
+    killed.forEach((id) =>
+      global.USERS[id].comm(GAME.NIGHT.END, { isKilled: true, killedList })
+    );
+    this.forEach(
+      ({ socket }) =>
+        socket.comm(GAME.NIGHT.END, { isKilled: false, killedList }),
+      { role: ROLES.EVERYONE }
+    );
+
+    await wait(5000);
+    this.stageAction(ROLES.EVERYONE);
+  }
+
+  async dayEnd() {
+    const killed = this.history[this.round][ROLES.EVERYONE].final;
+    this.players = this.players.map((player) => {
+      const { id, isDead } = player;
+      const isKilled = id === killed;
+      return {
+        ...player,
+        isDead: isDead || isKilled,
+      };
+    });
+    const { role } = this.players.find(({ id }) => id === killed);
+    const name = global.USERS[killed].name;
+
+    global.USERS[killed].comm(GAME.NIGHT.END, {
+      isKilled: true,
+      killedList: [],
+    });
+    this.forEach(({ socket }) => socket.comm(GAME.DAY.END, { name, role }));
+
+    await wait(5000);
+    this.nightStart();
   }
 }
 

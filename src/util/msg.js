@@ -13,12 +13,10 @@ const MSG = {
   GAME: {
     START: 'GAME_START',
     END: 'GAME_END',
-    ROLE: {
-      START: 'ROLE_START',
-      VOTE: 'ROLE_VOTE',
-      VOTED: 'ROLE_VOTED',
-      UNVOTED: 'ROLE_UNVOTED',
-      END: 'ROLE_END',
+    STAGE: {
+      START: 'STAGE_START',
+      VOTE: 'STAGE_VOTE',
+      END: 'STAGE_END',
     },
     NIGHT: {
       START: 'NIGHT_START',

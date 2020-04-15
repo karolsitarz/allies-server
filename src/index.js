@@ -81,7 +81,7 @@ app.ws('/', (socket) => {
     room.startGame();
   });
 
-  user.receive(MSG.GAME.ROLE.VOTE, (id) => {
+  user.receive(MSG.GAME.STAGE.VOTE, (id) => {
     if (!user.current_room) return;
     const room = global.ROOMS[user.current_room];
     if (!room) return;

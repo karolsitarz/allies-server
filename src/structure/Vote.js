@@ -14,7 +14,7 @@ class Vote {
     this.unanimous = unanimous;
   }
   vote(voter, voteFor) {
-    if (!this.final);
+    if (this.final) return;
     if (!this.list.hasOwnProperty(voteFor)) return;
     if (!this.voters.hasOwnProperty(voter)) return;
 
