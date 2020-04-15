@@ -1,6 +1,8 @@
 const express = require('express');
 const app = express();
 require('express-ws')(app);
+const emojiRegex = require('emoji-regex');
+
 require('./util/log');
 const User = require('./structure/User');
 const Room = require('./structure/Room');
@@ -30,12 +32,16 @@ app.ws('/', (socket) => {
     console.DLog('DISCONNECT', uid);
   });
 
-  user.receive(MSG.LOGIN.PROMPT, (name) => {
+  user.receive(MSG.LOGIN.PROMPT, ({ name, emoji }) => {
     try {
       if (typeof name !== 'string') throw new Error('Name is not a string.');
       if (!name.length) throw new Error('Name is too short.');
       if (name.length > 20) throw new Error('Name is too long.');
+      const regex = emojiRegex().test(emoji);
+      if (!regex) throw new Error('Invalid emoji.');
+
       user.name = name;
+      user.emoji = emoji;
       user.comm(MSG.LOGIN.SUCCESS, uid);
     } catch (e) {
       user.comm(MSG.LOGIN.FAILURE, e.message);

@@ -38,10 +38,11 @@ class Room {
 
   getPlayers() {
     return this.players.map((id) => {
-      const { name } = global.USERS[id];
+      const { name, emoji } = global.USERS[id];
       return {
         id,
         name,
+        emoji,
         isHost: this.host === id,
       };
     });

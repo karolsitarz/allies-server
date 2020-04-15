@@ -93,8 +93,8 @@ class Game {
     this.current_role = role;
     this.setCurrentHistory();
     const players = Object.entries(this.players).map(([id, { isDead }]) => {
-      const { name } = global.USERS[id];
-      return { id, name, isDead, voted: [] };
+      const { name, emoji } = global.USERS[id];
+      return { id, name, emoji, isDead, voted: [] };
     });
     this.forEach(({ socket }) => socket.comm(GAME.WAKE, players));
   }
@@ -109,13 +109,20 @@ class Game {
     if (!vote) return;
     const { tally, isVoteValid } = vote;
     const list = voting.getList();
+
     const players = Object.entries(this.players).map(([id, { isDead }]) => {
-      const { name } = global.USERS[id];
+      const { name, emoji } = global.USERS[id];
+      const voted = (list[id] || []).slice(-3).map((id) => ({
+        id,
+        emoji: global.USERS[id].emoji,
+      }));
+
       return {
         id,
         name,
+        emoji,
         isDead,
-        voted: list[id] || [],
+        voted,
         isMostVoted: tally.includes(id),
       };
     });
@@ -152,6 +159,7 @@ class Game {
     const killedList = killed.map((id) => ({
       id,
       name: global.USERS[id].name,
+      emoji: global.USERS[id].emoji,
     }));
 
     killed.forEach((id) => {
@@ -177,20 +185,22 @@ class Game {
     const killed = this.history[this.round][ROLES.EVERYONE].final;
     this.players[killed].isDead = true;
     const { role } = this.players[killed];
-    const name = global.USERS[killed].name;
+    const { name, emoji } = global.USERS[killed];
 
     global.USERS[killed].comm(GAME.SUMMARY, {
       isKilled: true,
       killedList: [],
     });
-    this.forEach(({ socket }) => socket.comm(GAME.REVEAL, { name, role }));
+    this.forEach(({ socket }) =>
+      socket.comm(GAME.REVEAL, { name, emoji, role })
+    );
 
     const result = this.gameResult();
     if (!result) {
-      await wait(10000);
+      await wait(7500);
       return this.roundStart();
     }
-    await wait(5000);
+    await wait(7500);
     this.forEach(({ socket }) => socket.comm(GAME.END, result));
   }
 
@@ -211,7 +221,7 @@ class Game {
 module.exports = Game;
 
 const generateRoles = (count) => {
-  const mafia = Math.round(count / 2);
+  const mafia = Math.round(count / 3.5);
   return [
     {
       role: ROLES.MAFIA,
