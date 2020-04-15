@@ -1,5 +1,4 @@
 const shuffle = require('fisher-yates');
-const shuffleInplace = require('fisher-yates/inplace');
 const { GAME } = require('../util/msg');
 const { wait } = require('../util/async');
 const Vote = require('./Vote');
@@ -14,32 +13,32 @@ const GAME_ORDER = [ROLES.MAFIA];
 class Game {
   constructor(players) {
     const shuffled = shuffle(players);
-    const roles = generateRoles(shuffled.length);
+    const roles = generateRoles(players.length);
 
-    this.players = roles.reduce((acc, current) => {
-      const { count, role } = current;
+    const playerList = roles.reduce((acc, { count, role }) => {
       const mapped = shuffled
         .slice(acc.length, acc.length + count)
-        .map((p) => ({
-          id: p,
+        .map((id) => ({
+          id,
           role,
-          isDead: false,
         }));
       return [...acc, ...mapped];
     }, []);
-    shuffleInplace(this.players);
+
+    this.players = shuffle(playerList).reduce(
+      (acc, { id, role }) => ({ ...acc, [id]: { role, isDead: false } }),
+      {}
+    );
 
     this.current_role = ROLES.EVERYONE;
     this.round = -1;
     this.history = [];
     this.timeout = null;
-
-    this.roleAction = null;
   }
 
   forEach(callback, { toDead = false, role: toRole = this.current_role } = {}) {
-    this.players.forEach((player) => {
-      const { id, role, isDead } = player;
+    Object.entries(this.players).forEach(([id, player]) => {
+      const { role, isDead } = player;
       if (!toDead && isDead) return;
       if (toRole !== ROLES.EVERYONE && role !== toRole) return;
       callback({ ...player, socket: global.USERS[id] });
@@ -47,16 +46,23 @@ class Game {
   }
 
   setCurrentHistory() {
-    const { round, current_role, players } = this;
+    const { round, current_role } = this;
     if (!this.history[round]) this.history[round] = {};
     if (!this.history[round][current_role]) {
-      const alivePlayers = players.filter(({ isDead }) => !isDead);
-      const rolePlayers = alivePlayers.filter(
-        ({ role }) => current_role === ROLES.EVERYONE || role === current_role
+      const alive_players = Object.entries(this.players).reduce(
+        (acc, [id, { isDead }]) => (isDead ? acc : [...acc, id]),
+        []
       );
+      const role_players =
+        current_role === ROLES.EVERYONE
+          ? [...alive_players]
+          : alive_players.filter(
+              (id) => this.players[id].role === current_role
+            );
+
       this.history[round][current_role] = new Vote(
-        alivePlayers,
-        rolePlayers,
+        alive_players,
+        role_players,
         current_role === ROLES.EVERYONE
       );
     }
@@ -86,9 +92,9 @@ class Game {
   stageAction(role) {
     this.current_role = role;
     this.setCurrentHistory();
-    const players = this.players.map(({ id, isDead }) => {
+    const players = Object.entries(this.players).map(([id, { isDead }]) => {
       const { name } = global.USERS[id];
-      return { id, isDead, name, voted: [] };
+      return { id, name, isDead, voted: [] };
     });
     this.forEach(({ socket }) => socket.comm(GAME.STAGE.START, players));
   }
@@ -103,12 +109,12 @@ class Game {
     if (!vote) return;
     const { tally, isVoteValid } = vote;
     const list = voting.getList();
-    const players = this.players.map(({ id, isDead }) => {
+    const players = Object.entries(this.players).map(([id, { isDead }]) => {
       const { name } = global.USERS[id];
       return {
         id,
-        isDead,
         name,
+        isDead,
         voted: list[id] || [],
         isMostVoted: tally.includes(id),
       };
@@ -146,18 +152,11 @@ class Game {
       name: global.USERS[id].name,
     }));
 
-    this.players = this.players.map((player) => {
-      const { id, isDead } = player;
-      const isKilled = killed.includes(id);
-      return {
-        ...player,
-        isDead: isDead || isKilled,
-      };
+    killed.forEach((id) => {
+      this.players[id].isDead = true;
+      global.USERS[id].comm(GAME.NIGHT.END, { isKilled: true, killedList });
     });
 
-    killed.forEach((id) =>
-      global.USERS[id].comm(GAME.NIGHT.END, { isKilled: true, killedList })
-    );
     this.forEach(
       ({ socket }) =>
         socket.comm(GAME.NIGHT.END, { isKilled: false, killedList }),
@@ -170,15 +169,8 @@ class Game {
 
   async dayEnd() {
     const killed = this.history[this.round][ROLES.EVERYONE].final;
-    this.players = this.players.map((player) => {
-      const { id, isDead } = player;
-      const isKilled = id === killed;
-      return {
-        ...player,
-        isDead: isDead || isKilled,
-      };
-    });
-    const { role } = this.players.find(({ id }) => id === killed);
+    this.players[killed].isDead = true;
+    const { role } = this.players[killed];
     const name = global.USERS[killed].name;
 
     global.USERS[killed].comm(GAME.NIGHT.END, {

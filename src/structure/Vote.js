@@ -1,13 +1,7 @@
 class Vote {
   constructor(list, voters, unanimous = false) {
-    this.voters = voters.reduce((acc, current) => {
-      const { id } = current;
-      return { ...acc, [id]: null };
-    }, {});
-    this.list = list.reduce((acc, current) => {
-      const { id } = current;
-      return { ...acc, [id]: [] };
-    }, {});
+    this.voters = voters.reduce((acc, id) => ({ ...acc, [id]: null }), {});
+    this.list = list.reduce((acc, id) => ({ ...acc, [id]: [] }), {});
 
     this.voters._length = voters.length;
     this.final = null;

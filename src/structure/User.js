@@ -2,7 +2,7 @@ const randomize = require('randomatic');
 
 class User {
   constructor(socket) {
-    const id = randomize('A0', 10);
+    const id = randomize('A', 10);
     this.id = id;
     this.socket = socket;
     this.name = null;
