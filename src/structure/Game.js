@@ -96,7 +96,17 @@ class Game {
       const { name, emoji } = global.USERS[id];
       return { id, name, emoji, isDead, voted: [] };
     });
-    this.forEach(({ socket }) => socket.comm(GAME.WAKE, players));
+    this.forEach(({ socket }) =>
+      socket.comm(GAME.WAKE, { players, message: this.getVoteText() })
+    );
+  }
+
+  getVoteText() {
+    if (this.current_role === ROLES.EVERYONE) {
+      return `Day ${this.round + 1}`;
+    }
+
+    return `Night ${this.round + 1}`;
   }
 
   vote(voter, voteFor) {
