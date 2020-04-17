@@ -140,7 +140,9 @@ class Game {
         voting.seal();
         this.timeout = null;
 
-        if (this.current_role === ROLES.EVERYONE) return this.reveal();
+        if (this.current_role === ROLES.EVERYONE) {
+          return this.reveal();
+        }
         this.sleep();
       }, 5000);
     }
@@ -178,7 +180,9 @@ class Game {
     if (!result) {
       return this.wake(ROLES.EVERYONE);
     }
-    this.forEach(({ socket }) => socket.comm(GAME.END, result));
+    this.forEach(({ socket }) => socket.comm(GAME.END, result), {
+      role: ROLES.EVERYONE,
+    });
   }
 
   async reveal() {
