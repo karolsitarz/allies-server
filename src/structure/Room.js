@@ -17,14 +17,19 @@ class Room {
   }
 
   join(user) {
-    if (user.current_room) return;
-    if (this.players.includes(user.id)) return;
+    if (user.current_room) throw new Error('User is already in a room.');
+    if (this.players.includes(user.id))
+      throw new Error('User is already in this room.');
+    if (this.game) throw new Error('Game already in progress.');
+
     this.players.push(user.id);
     user.current_room = this.id;
   }
 
   leave(user) {
-    if (user.current_room != this.id) return;
+    if (user.current_room != this.id)
+      throw new Error("Can't leave a room the user is not in.");
+
     this.players = this.players.filter((s) => s !== user.id);
     user.current_room = null;
     if (!this.players.length) {

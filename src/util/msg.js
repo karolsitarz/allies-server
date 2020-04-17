@@ -1,4 +1,5 @@
 const MSG = {
+  INFO: 'INFO_MODAL',
   LOGIN: {
     PROMPT: 'LOGIN_PROMPT',
     SUCCESS: 'LOGIN_SUCCESS',

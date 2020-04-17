@@ -1,4 +1,5 @@
 const randomize = require('randomatic');
+const MSG = require('../util/msg');
 
 class User {
   constructor(socket) {
@@ -34,7 +35,12 @@ class User {
       }
 
       if (data.message !== message) return;
-      callback(data.data);
+      try {
+        const passed = data.data || {};
+        callback(passed);
+      } catch ({ message }) {
+        this.comm(MSG.INFO, { message });
+      }
     });
   }
 }

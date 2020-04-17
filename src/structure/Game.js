@@ -110,6 +110,8 @@ class Game {
   }
 
   vote(voter, voteFor) {
+    if (!players[voter]) return;
+    if (players[voter].isDead) return;
     const round = this.history[this.round];
     if (!round) return;
     const voting = round[this.current_role];

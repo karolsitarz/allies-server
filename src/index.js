@@ -33,22 +33,21 @@ app.ws('/', (socket) => {
   });
 
   user.receive(MSG.LOGIN.PROMPT, ({ name, emoji }) => {
-    try {
-      if (typeof name !== 'string') throw new Error('Name is not a string.');
-      if (!name.length) throw new Error('Name is too short.');
-      if (name.length > 20) throw new Error('Name is too long.');
-      const regex = emojiRegex().test(emoji);
-      if (!regex) throw new Error('Invalid emoji.');
+    if (user.name) throw new Error('User already logged in.');
+    if (typeof name !== 'string') throw new Error('Name is not a string.');
+    if (!name.length) throw new Error('Name is too short.');
+    if (name.length > 20) throw new Error('Name is too long.');
+    const regex = emojiRegex().test(emoji);
+    if (!regex) throw new Error('Invalid emoji.');
 
-      user.name = name;
-      user.emoji = emoji;
-      user.comm(MSG.LOGIN.SUCCESS, uid);
-    } catch (e) {
-      user.comm(MSG.LOGIN.FAILURE, e.message);
-    }
+    user.name = name;
+    user.emoji = emoji;
+    user.comm(MSG.LOGIN.SUCCESS, uid);
   });
 
   user.receive(MSG.ROOM.CREATE, () => {
+    if (user.current_room) throw new Error('User is already in a room');
+
     const room = new Room();
     const { id } = room;
     global.ROOMS[id] = room;
@@ -61,7 +60,7 @@ app.ws('/', (socket) => {
 
   user.receive(MSG.ROOM.JOIN, (id) => {
     const room = global.ROOMS[id];
-    if (!room) return;
+    if (!room) throw new Error('Room does not exist.');
 
     room.join(user);
     user.comm(MSG.ROOM.JOIN, id);
@@ -69,9 +68,12 @@ app.ws('/', (socket) => {
   });
 
   user.receive(MSG.ROOM.LEAVE, () => {
-    if (!user.current_room) return;
+    if (!user.current_room) throw new Error('User is not in a room.');
     const room = global.ROOMS[user.current_room];
-    if (!room) return;
+    if (!room) {
+      user.current_room = null;
+      throw new Error('The room does not exist.');
+    }
 
     room.leave(user);
     user.comm(MSG.ROOM.LEAVE);
@@ -79,21 +81,22 @@ app.ws('/', (socket) => {
   });
 
   user.receive(MSG.GAME.START, () => {
-    if (!user.current_room) return;
+    if (!user.current_room) throw new Error('User is not in any room');
     const room = global.ROOMS[user.current_room];
-    if (!room) return;
-    if (room.host !== user.id) return;
+    if (!room) throw new Error('User is not in a valid room');
+    if (room.host !== user.id) throw new Error('User is not a host');
 
-    if (room.players.length < 4) return;
+    if (room.players.length < 4)
+      throw new Error('Minimum 4 players required to start the game');
     room.startGame();
   });
 
   user.receive(MSG.GAME.VOTE, (id) => {
-    if (!user.current_room) return;
+    if (!user.current_room) throw new Error('User is not in any room');
     const room = global.ROOMS[user.current_room];
-    if (!room) return;
+    if (!room) throw new Error('User is not in a valid room');
     const game = room.game;
-    if (!game) return;
+    if (!game) throw new Error('User is not in a valid game');
 
     game.vote(user.id, id);
   });
