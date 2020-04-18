@@ -63,10 +63,6 @@ class Vote {
     this.final = tally[i];
     return this.final;
   }
-
-  getList() {
-    return this.list;
-  }
 }
 
 module.exports = Vote;

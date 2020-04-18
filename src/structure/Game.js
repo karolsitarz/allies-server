@@ -25,10 +25,10 @@ class Game {
       return [...acc, ...mapped];
     }, []);
 
-    this.players = shuffle(playerList).reduce(
-      (acc, { id, role }) => ({ ...acc, [id]: { role, isDead: false } }),
-      {}
-    );
+    this.players = shuffle(playerList).reduce((acc, { id, role }) => {
+      const { name, emoji } = global.USERS[id];
+      return { ...acc, [id]: { name, emoji, role, isDead: false } };
+    }, {});
 
     this.current_role = ROLES.EVERYONE;
     this.round = -1;
@@ -41,7 +41,7 @@ class Game {
       const { role, isDead } = player;
       if (!toDead && isDead) return;
       if (toRole !== ROLES.EVERYONE && role !== toRole) return;
-      callback({ ...player, socket: global.USERS[id] });
+      callback({ ...player, id, socket: global.USERS[id] });
     });
   }
 
@@ -69,7 +69,24 @@ class Game {
   }
 
   async start() {
-    this.forEach(({ socket, role }) => socket.comm(GAME.START, role));
+    this.forEach(({ socket, role: playerRole, id: playerID }) => {
+      const players = Object.entries(this.players).map(([id, player]) => {
+        const { name, emoji, isDead, isRevealed, role } = player;
+        return {
+          id,
+          name,
+          emoji,
+          isDead,
+          voted: [],
+          role:
+            (isRevealed ||
+              id === playerID ||
+              (playerRole !== ROLES.CITIZEN && playerRole === role)) &&
+            role,
+        };
+      });
+      socket.comm(GAME.START, players);
+    });
     await wait(10000);
     this.roundStart();
   }
@@ -92,13 +109,8 @@ class Game {
   wake(role) {
     this.current_role = role;
     this.setCurrentHistory();
-    const players = Object.entries(this.players).map(([id, { isDead }]) => {
-      const { name, emoji } = global.USERS[id];
-      return { id, name, emoji, isDead, voted: [] };
-    });
-    this.forEach(({ socket }) =>
-      socket.comm(GAME.WAKE, { players, message: this.getVoteText() })
-    );
+    const message = this.getVoteText();
+    this.forEach(({ socket }) => socket.comm(GAME.WAKE, message));
   }
 
   getVoteText() {
@@ -110,8 +122,8 @@ class Game {
   }
 
   vote(voter, voteFor) {
-    if (!players[voter]) return;
-    if (players[voter].isDead) return;
+    if (!this.players[voter]) return;
+    if (this.players[voter].isDead) return;
     const round = this.history[this.round];
     if (!round) return;
     const voting = round[this.current_role];
@@ -120,27 +132,14 @@ class Game {
     const vote = voting.vote(voter, voteFor);
     if (!vote) return;
     const { tally, isVoteValid } = vote;
-    const list = voting.getList();
+    const list = voting.list;
 
-    const players = Object.entries(this.players).map(([id, { isDead }]) => {
-      const { name, emoji } = global.USERS[id];
-      const voted = (list[id] || []).slice(-3).map((id) => ({
-        id,
-        emoji: global.USERS[id].emoji,
-      }));
-
-      return {
-        id,
-        name,
-        emoji,
-        isDead,
-        voted,
-        isMostVoted: tally.includes(id),
-      };
-    });
+    const voted = Object.keys(this.players).map((id) =>
+      (list[id] || []).slice(-3)
+    );
 
     this.forEach(({ socket }) =>
-      socket.comm(GAME.VOTE, { isVoteValid, players })
+      socket.comm(GAME.VOTE, { isVoteValid, voted, tally })
     );
 
     if (this.timeout) {
@@ -170,20 +169,14 @@ class Game {
     await wait(5000);
     // TODO: a function for getting results
     const killed = [this.history[this.round][ROLES.MAFIA].final];
-    const killedList = killed.map((id) => ({
-      id,
-      name: global.USERS[id].name,
-      emoji: global.USERS[id].emoji,
-    }));
 
     killed.forEach((id) => {
       this.players[id].isDead = true;
-      global.USERS[id].comm(GAME.SUMMARY, { isKilled: true, killedList });
+      global.USERS[id].comm(GAME.SUMMARY, { isKilled: true, killed });
     });
 
     this.forEach(
-      ({ socket }) =>
-        socket.comm(GAME.SUMMARY, { isKilled: false, killedList }),
+      ({ socket }) => socket.comm(GAME.SUMMARY, { isKilled: false, killed }),
       { role: ROLES.EVERYONE }
     );
 
@@ -201,14 +194,13 @@ class Game {
     const killed = this.history[this.round][ROLES.EVERYONE].final;
     this.players[killed].isDead = true;
     const { role } = this.players[killed];
-    const { name, emoji } = global.USERS[killed];
 
     global.USERS[killed].comm(GAME.SUMMARY, {
       isKilled: true,
-      killedList: [],
+      killed: [killed],
     });
     this.forEach(({ socket }) =>
-      socket.comm(GAME.REVEAL, { name, emoji, role })
+      socket.comm(GAME.REVEAL, { id: killed, role })
     );
 
     const result = this.gameResult();
@@ -237,7 +229,7 @@ class Game {
 module.exports = Game;
 
 const generateRoles = (count) => {
-  const mafia = Math.round(count / 3.5);
+  const mafia = Math.round(count / 1.5);
   return [
     {
       role: ROLES.MAFIA,
