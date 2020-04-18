@@ -36,11 +36,11 @@ class Game {
     this.timeout = null;
   }
 
-  forEach(callback, { toDead = false, role: toRole = this.current_role } = {}) {
+  forEach(callback, { toDead = true, role: toRole = this.current_role } = {}) {
     Object.entries(this.players).forEach(([id, player]) => {
       const { role, isDead } = player;
+      if (!isDead && toRole !== ROLES.EVERYONE && role !== toRole) return;
       if (!toDead && isDead) return;
-      if (toRole !== ROLES.EVERYONE && role !== toRole) return;
       callback({ ...player, id, socket: global.USERS[id] });
     });
   }
@@ -170,13 +170,21 @@ class Game {
     // TODO: a function for getting results
     const killed = [this.history[this.round][ROLES.MAFIA].final];
 
+    const players = Object.entries(this.players).reduce(
+      (acc, [id, { role }]) => ({ ...acc, [id]: role }),
+      {}
+    );
+
     killed.forEach((id) => {
       this.players[id].isDead = true;
-      global.USERS[id].comm(GAME.SUMMARY, { isKilled: true, killed });
+      global.USERS[id].comm(GAME.SUMMARY, { isKilled: true, killed, players });
     });
 
     this.forEach(
-      ({ socket }) => socket.comm(GAME.SUMMARY, { isKilled: false, killed }),
+      ({ socket, id }) => {
+        if (killed.includes(id)) return;
+        socket.comm(GAME.SUMMARY, { isKilled: false, killed });
+      },
       { role: ROLES.EVERYONE }
     );
 
@@ -195,13 +203,20 @@ class Game {
     this.players[killed].isDead = true;
     const { role } = this.players[killed];
 
+    const players = Object.entries(this.players).reduce(
+      (acc, [id, { role }]) => ({ ...acc, [id]: role }),
+      {}
+    );
+
     global.USERS[killed].comm(GAME.SUMMARY, {
       isKilled: true,
       killed: [killed],
+      players,
     });
-    this.forEach(({ socket }) =>
-      socket.comm(GAME.REVEAL, { id: killed, role })
-    );
+    this.forEach(({ socket, id }) => {
+      if (killed === id) return;
+      socket.comm(GAME.REVEAL, { id: killed, role });
+    });
 
     const result = this.gameResult();
     if (!result) {
@@ -229,7 +244,7 @@ class Game {
 module.exports = Game;
 
 const generateRoles = (count) => {
-  const mafia = Math.round(count / 1.5);
+  const mafia = Math.round(count / 3.5);
   return [
     {
       role: ROLES.MAFIA,
