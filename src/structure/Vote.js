@@ -45,22 +45,24 @@ class Vote {
       },
       { maxCount: 0, tally: [], voteCount: 0 }
     );
-    if (!maxCount)
+
+    if (maxCount === 0)
       return {
         tally: [],
         isVoteValid: false,
       };
-    const validUnanimous = !(this.unanimous && tally.length > 1);
+
+    const unanimousTally = this.unanimous && tally.length > 1 ? [] : tally;
     return {
-      tally,
-      isVoteValid: voteCount === this.voters._length && validUnanimous,
+      tally: unanimousTally,
+      isVoteValid: voteCount === this.voters._length,
     };
   }
 
   seal() {
     const { tally } = this.getTally();
     const i = Math.floor(Math.random() * tally.length);
-    this.final = tally[i];
+    this.final = tally[i] || null;
     return this.final;
   }
 }

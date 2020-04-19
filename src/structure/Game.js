@@ -183,8 +183,6 @@ class Game {
   }
 
   async summary() {
-    let shouldEnd = await this.wait(5000);
-    if (shouldEnd) return;
     // TODO: a function for getting results
     const killed = [this.history[this.round][ROLES.MAFIA].final];
 
@@ -211,7 +209,7 @@ class Game {
       { role: ROLES.EVERYONE }
     );
 
-    shouldEnd = await this.wait(5000);
+    const shouldEnd = await this.wait(5000);
     if (shouldEnd) return;
     this.getResult();
     if (!this.end_result) {
@@ -224,6 +222,13 @@ class Game {
 
   async reveal() {
     const killed = this.history[this.round][ROLES.EVERYONE].final;
+    if (!killed) {
+      this.forEach(({ socket }) => socket.comm(GAME.REVEAL, { id: null }));
+      const shouldEnd = await this.wait(5000);
+      if (shouldEnd) return;
+      return this.roundStart();
+    }
+
     this.players[killed].isDead = true;
     const { role } = this.players[killed];
 
@@ -244,11 +249,11 @@ class Game {
 
     this.getResult();
     if (!this.end_result) {
-      const shouldEnd = await this.wait(7500);
+      const shouldEnd = await this.wait(5000);
       if (shouldEnd) return;
       return this.roundStart();
     }
-    const shouldEnd = await this.wait(7500);
+    const shouldEnd = await this.wait(5000);
     if (shouldEnd) return;
     this.forEach(({ socket }) => socket.comm(GAME.END, this.end_result));
   }
