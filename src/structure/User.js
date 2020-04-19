@@ -13,6 +13,7 @@ class User {
   comm(message, data) {
     if (typeof message !== 'string') return;
     const { socket } = this;
+    if (socket.readyState !== 1) return;
     try {
       const parsed = JSON.stringify({ message, data });
       socket.send(parsed);

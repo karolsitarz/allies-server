@@ -1,6 +1,7 @@
 const randomize = require('randomatic');
 const Game = require('./Game');
 
+const { ROOM } = require('../util/msg');
 class Room {
   constructor() {
     const id = randomize('A', 5);
@@ -20,10 +21,14 @@ class Room {
     if (user.current_room) throw new Error('User is already in a room.');
     if (this.players.includes(user.id))
       throw new Error('User is already in this room.');
-    if (this.game) throw new Error('Game already in progress.');
+    if (this.game && !this.game.end_result)
+      throw new Error('Game already in progress.');
 
     this.players.push(user.id);
     user.current_room = this.id;
+
+    user.comm(ROOM.JOIN, this.id);
+    this.commAll(ROOM.UPDATE, this.getPlayers());
   }
 
   leave(user) {
@@ -34,11 +39,23 @@ class Room {
     user.current_room = null;
     if (!this.players.length) {
       delete global.ROOMS[this.id];
-      return;
-    }
-    if (this.host === user.id) {
+    } else if (this.host === user.id) {
       this.host = this.players[0];
     }
+
+    user.comm(ROOM.LEAVE);
+
+    if (
+      this.game &&
+      !this.game.players[user.id].isDead &&
+      !this.game.end_result
+    ) {
+      this.game.is_interrupted = true;
+      this.game = null;
+      this.commAll(ROOM.JOIN, this.id);
+    }
+
+    this.commAll(ROOM.UPDATE, this.getPlayers());
   }
 
   getPlayers() {

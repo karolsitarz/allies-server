@@ -1,6 +1,5 @@
 const shuffle = require('fisher-yates');
 const { GAME } = require('../util/msg');
-const { wait } = require('../util/async');
 const Vote = require('./Vote');
 
 const ROLES = {
@@ -34,6 +33,16 @@ class Game {
     this.round = -1;
     this.history = [];
     this.timeout = null;
+    this.end_result = null;
+    this.is_interrupted = false;
+  }
+
+  wait(time) {
+    return new Promise((res) => {
+      setTimeout(() => {
+        res(this.is_interrupted);
+      }, time);
+    });
   }
 
   forEach(callback, { toDead = true, role: toRole = this.current_role } = {}) {
@@ -41,31 +50,34 @@ class Game {
       const { role, isDead } = player;
       if (!isDead && toRole !== ROLES.EVERYONE && role !== toRole) return;
       if (!toDead && isDead) return;
-      callback({ ...player, id, socket: global.USERS[id] });
+
+      callback({
+        ...player,
+        id,
+        socket: global.USERS[id] || { comm: () => {} },
+      });
     });
   }
 
   setCurrentHistory() {
     const { round, current_role } = this;
     if (!this.history[round]) this.history[round] = {};
-    if (!this.history[round][current_role]) {
-      const alive_players = Object.entries(this.players).reduce(
-        (acc, [id, { isDead }]) => (isDead ? acc : [...acc, id]),
-        []
-      );
-      const role_players =
-        current_role === ROLES.EVERYONE
-          ? [...alive_players]
-          : alive_players.filter(
-              (id) => this.players[id].role === current_role
-            );
+    if (this.history[round][current_role]) return;
 
-      this.history[round][current_role] = new Vote(
-        alive_players,
-        role_players,
-        current_role === ROLES.EVERYONE
-      );
-    }
+    const alive_players = Object.entries(this.players).reduce(
+      (acc, [id, { isDead }]) => (isDead ? acc : [...acc, id]),
+      []
+    );
+    const role_players =
+      current_role === ROLES.EVERYONE
+        ? [...alive_players]
+        : alive_players.filter((id) => this.players[id].role === current_role);
+
+    this.history[round][current_role] = new Vote(
+      alive_players,
+      role_players,
+      current_role === ROLES.EVERYONE
+    );
   }
 
   async start() {
@@ -87,14 +99,17 @@ class Game {
       });
       socket.comm(GAME.START, players);
     });
-    await wait(10000);
+
+    const shouldEnd = await this.wait(10000);
+    if (shouldEnd) return;
     this.roundStart();
   }
 
   async roundStart() {
     this.round += 1;
     this.forEach(({ socket }) => socket.comm(GAME.SLEEP));
-    await wait(5000);
+    const shouldEnd = await this.wait(5000);
+    if (shouldEnd) return;
 
     this.roleAction = GAME_ORDER.reduceRight(
       (acc, current) => () => {
@@ -124,6 +139,7 @@ class Game {
   vote(voter, voteFor) {
     if (!this.players[voter]) return;
     if (this.players[voter].isDead) return;
+    if (this.end_result) return;
     const round = this.history[this.round];
     if (!round) return;
     const voting = round[this.current_role];
@@ -161,12 +177,14 @@ class Game {
 
   async sleep() {
     this.forEach(({ socket }) => socket.comm(GAME.SLEEP));
+    const shouldEnd = await this.wait(5000);
+    if (shouldEnd) return;
     this.roleAction = this.roleAction();
-    await wait(5000);
   }
 
   async summary() {
-    await wait(5000);
+    let shouldEnd = await this.wait(5000);
+    if (shouldEnd) return;
     // TODO: a function for getting results
     const killed = [this.history[this.round][ROLES.MAFIA].final];
 
@@ -177,7 +195,12 @@ class Game {
 
     killed.forEach((id) => {
       this.players[id].isDead = true;
-      global.USERS[id].comm(GAME.SUMMARY, { isKilled: true, killed, players });
+      if (global.USERS[id])
+        global.USERS[id].comm(GAME.SUMMARY, {
+          isKilled: true,
+          killed,
+          players,
+        });
     });
 
     this.forEach(
@@ -188,12 +211,13 @@ class Game {
       { role: ROLES.EVERYONE }
     );
 
-    await wait(5000);
-    const result = this.gameResult();
-    if (!result) {
+    shouldEnd = await this.wait(5000);
+    if (shouldEnd) return;
+    this.getResult();
+    if (!this.end_result) {
       return this.wake(ROLES.EVERYONE);
     }
-    this.forEach(({ socket }) => socket.comm(GAME.END, result), {
+    this.forEach(({ socket }) => socket.comm(GAME.END, this.end_result), {
       role: ROLES.EVERYONE,
     });
   }
@@ -207,27 +231,30 @@ class Game {
       (acc, [id, { role }]) => ({ ...acc, [id]: role }),
       {}
     );
-
-    global.USERS[killed].comm(GAME.SUMMARY, {
-      isKilled: true,
-      killed: [killed],
-      players,
-    });
+    if (global.USERS[killed])
+      global.USERS[killed].comm(GAME.SUMMARY, {
+        isKilled: true,
+        killed: [killed],
+        players,
+      });
     this.forEach(({ socket, id }) => {
       if (killed === id) return;
       socket.comm(GAME.REVEAL, { id: killed, role });
     });
 
-    const result = this.gameResult();
-    if (!result) {
-      await wait(7500);
+    this.getResult();
+    if (!this.end_result) {
+      const shouldEnd = await this.wait(7500);
+      if (shouldEnd) return;
       return this.roundStart();
     }
-    await wait(7500);
-    this.forEach(({ socket }) => socket.comm(GAME.END, result));
+    const shouldEnd = await this.wait(7500);
+    if (shouldEnd) return;
+    this.forEach(({ socket }) => socket.comm(GAME.END, this.end_result));
   }
 
-  gameResult() {
+  getResult() {
+    if (this.end_result) return;
     let mafiaAlive = false;
     let citizenAlive = false;
     Object.values(this.players).forEach(({ role, isDead }) => {
@@ -236,8 +263,8 @@ class Game {
     });
 
     if (mafiaAlive && citizenAlive) return;
-    if (mafiaAlive && !citizenAlive) return ROLES.MAFIA;
-    if (!mafiaAlive && citizenAlive) return ROLES.CITIZEN;
+    if (mafiaAlive && !citizenAlive) this.end_result = ROLES.MAFIA;
+    if (!mafiaAlive && citizenAlive) this.end_result = ROLES.CITIZEN;
   }
 }
 

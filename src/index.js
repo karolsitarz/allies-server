@@ -22,11 +22,9 @@ app.ws('/', (socket) => {
 
   socket.on('close', () => {
     if (uid == null) return;
-    const { current_room } = user;
-    if (current_room) {
-      const room = global.ROOMS[current_room];
+    if (user.current_room) {
+      const room = global.ROOMS[user.current_room];
       room.leave(user);
-      room.commAll(MSG.ROOM.UPDATE, room.getPlayers());
     }
     delete global.USERS[uid];
     console.DLog('DISCONNECT', uid);
@@ -50,12 +48,10 @@ app.ws('/', (socket) => {
 
     const room = new Room();
     const { id } = room;
+    room.host = uid;
     global.ROOMS[id] = room;
 
     room.join(user);
-    room.host = uid;
-    user.comm(MSG.ROOM.JOIN, id);
-    room.commAll(MSG.ROOM.UPDATE, room.getPlayers());
   });
 
   user.receive(MSG.ROOM.JOIN, (id) => {
@@ -63,8 +59,6 @@ app.ws('/', (socket) => {
     if (!room) throw new Error('Room does not exist.');
 
     room.join(user);
-    user.comm(MSG.ROOM.JOIN, id);
-    room.commAll(MSG.ROOM.UPDATE, room.getPlayers());
   });
 
   user.receive(MSG.ROOM.LEAVE, () => {
@@ -76,8 +70,6 @@ app.ws('/', (socket) => {
     }
 
     room.leave(user);
-    user.comm(MSG.ROOM.LEAVE);
-    room.commAll(MSG.ROOM.UPDATE, room.getPlayers());
   });
 
   user.receive(MSG.GAME.START, () => {
@@ -85,9 +77,9 @@ app.ws('/', (socket) => {
     const room = global.ROOMS[user.current_room];
     if (!room) throw new Error('User is not in a valid room');
     if (room.host !== user.id) throw new Error('User is not a host');
-
     if (room.players.length < 4)
       throw new Error('Minimum 4 players required to start the game');
+
     room.startGame();
   });
 
