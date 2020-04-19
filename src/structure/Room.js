@@ -48,8 +48,8 @@ class Room {
 
     if (
       this.game &&
-      !this.game.players[user.id].isDead &&
-      !this.game.end_result
+      !this.game.end_result &&
+      !this.game.players[user.id].isDead
     ) {
       this.game.is_interrupted = true;
       this.game = null;
@@ -86,7 +86,12 @@ class Room {
       throw new Error('Not everyone is ready');
 
     this.game = new Game(this.players);
+    this.players = this.players.map((player) => ({
+      ...player,
+      isReady: false,
+    }));
     this.game.start();
+    this.commAll(ROOM.UPDATE, this.getPlayers());
   }
 }
 
