@@ -9,26 +9,29 @@ const ROLES = {
 };
 
 const GAME_ORDER = [ROLES.MAFIA];
+
+const getShuffledPlayers = (players) => {
+  const shuffled = shuffle(players);
+  const roles = generateRoles(players.length);
+
+  const playerList = roles.reduce((acc, { count, role }) => {
+    const mapped = shuffled
+      .slice(acc.length, acc.length + count)
+      .map(({ id, name, emoji }) => ({ id, name, emoji, role }));
+    return [...acc, ...mapped];
+  }, []);
+
+  return shuffle(playerList).reduce(
+    (acc, { id, ...player }) => ({
+      ...acc,
+      [id]: { ...player, isDead: false },
+    }),
+    {}
+  );
+};
 class Game {
   constructor(players) {
-    const shuffled = shuffle(players);
-    const roles = generateRoles(players.length);
-
-    const playerList = roles.reduce((acc, { count, role }) => {
-      const mapped = shuffled
-        .slice(acc.length, acc.length + count)
-        .map(({ id, name, emoji }) => ({ id, name, emoji, role }));
-      return [...acc, ...mapped];
-    }, []);
-
-    this.players = shuffle(playerList).reduce(
-      (acc, { id, ...player }) => ({
-        ...acc,
-        [id]: { ...player, isDead: false },
-      }),
-      {}
-    );
-
+    this.players = getShuffledPlayers(players);
     this.current_role = ROLES.EVERYONE;
     this.round = -1;
     this.history = [];
@@ -211,8 +214,7 @@ class Game {
 
     const shouldEnd = await this.wait(5000);
     if (shouldEnd) return;
-    this.getResult();
-    if (!this.end_result) {
+    if (!this.getResult()) {
       return this.wake(ROLES.EVERYONE);
     }
     this.forEach(({ socket }) => socket.comm(GAME.END, this.end_result), {
@@ -247,8 +249,7 @@ class Game {
       socket.comm(GAME.REVEAL, { id: killed, role });
     });
 
-    this.getResult();
-    if (!this.end_result) {
+    if (!this.getResult()) {
       const shouldEnd = await this.wait(5000);
       if (shouldEnd) return;
       return this.roundStart();
@@ -269,11 +270,14 @@ class Game {
 
     if (mafiaAlive && citizenAlive) return;
     if (mafiaAlive && !citizenAlive) this.end_result = ROLES.MAFIA;
-    if (!mafiaAlive && citizenAlive) this.end_result = ROLES.CITIZEN;
+    else if (!mafiaAlive && citizenAlive) this.end_result = ROLES.CITIZEN;
+
+    return this.end_result;
   }
 }
 
 module.exports = Game;
+module.exports.roles = ROLES;
 
 const generateRoles = (count) => {
   const mafia = Math.round(count / 3.5);
