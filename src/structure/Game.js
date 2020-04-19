@@ -17,17 +17,17 @@ class Game {
     const playerList = roles.reduce((acc, { count, role }) => {
       const mapped = shuffled
         .slice(acc.length, acc.length + count)
-        .map((id) => ({
-          id,
-          role,
-        }));
+        .map(({ id, name, emoji }) => ({ id, name, emoji, role }));
       return [...acc, ...mapped];
     }, []);
 
-    this.players = shuffle(playerList).reduce((acc, { id, role }) => {
-      const { name, emoji } = global.USERS[id];
-      return { ...acc, [id]: { name, emoji, role, isDead: false } };
-    }, {});
+    this.players = shuffle(playerList).reduce(
+      (acc, { id, ...player }) => ({
+        ...acc,
+        [id]: { ...player, isDead: false },
+      }),
+      {}
+    );
 
     this.current_role = ROLES.EVERYONE;
     this.round = -1;

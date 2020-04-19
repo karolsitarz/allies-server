@@ -61,6 +61,14 @@ app.ws('/', (socket) => {
     room.join(user);
   });
 
+  user.receive(MSG.ROOM.READY, () => {
+    if (!user.current_room) throw new Error('User is not in a room.');
+    const room = global.ROOMS[user.current_room];
+    if (!room) throw new Error('User is not in a valid room.');
+
+    room.toggleReady(user);
+  });
+
   user.receive(MSG.ROOM.LEAVE, () => {
     if (!user.current_room) throw new Error('User is not in a room.');
     const room = global.ROOMS[user.current_room];
@@ -76,11 +84,8 @@ app.ws('/', (socket) => {
     if (!user.current_room) throw new Error('User is not in any room');
     const room = global.ROOMS[user.current_room];
     if (!room) throw new Error('User is not in a valid room');
-    if (room.host !== user.id) throw new Error('User is not a host');
-    if (room.players.length < 4)
-      throw new Error('Minimum 4 players required to start the game');
 
-    room.startGame();
+    room.startGame(user);
   });
 
   user.receive(MSG.GAME.VOTE, (id) => {

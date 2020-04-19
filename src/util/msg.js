@@ -10,6 +10,7 @@ const MSG = {
     JOIN: 'ROOM_JOIN',
     LEAVE: 'ROOM_LEAVE',
     UPDATE: 'ROOM_UPDATE',
+    READY: 'ROOM_READY',
   },
   GAME: {
     START: 'GAME_START',
