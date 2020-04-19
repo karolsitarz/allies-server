@@ -130,10 +130,10 @@ class Game {
 
   getVoteText() {
     if (this.current_role === ROLES.EVERYONE) {
-      return `Day ${this.round + 1}`;
+      return `day ${this.round + 1}`;
     }
 
-    return `Night ${this.round + 1}`;
+    return `night ${this.round + 1}`;
   }
 
   vote(voter, voteFor) {
