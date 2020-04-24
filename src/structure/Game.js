@@ -9,6 +9,8 @@ const ROLES = {
   CITIZEN: 'citizen',
 };
 
+const TIME = 5000;
+
 const ROLES_ORDER = [ROLES.MAFIA, ROLES.DOCTOR];
 
 const getShuffledPlayers = (players) => {
@@ -40,6 +42,9 @@ class Game {
     this.timeout = null;
     this.end_result = null;
     this.is_interrupted = false;
+    this.settings = {
+      doctor_self: 2,
+    };
   }
 
   wait(time) {
@@ -105,7 +110,7 @@ class Game {
       socket.comm(GAME.START, players);
     });
 
-    const shouldEnd = await this.wait(10000);
+    const shouldEnd = await this.wait(TIME * 2);
     if (shouldEnd) return;
     this.roundStart();
   }
@@ -113,7 +118,7 @@ class Game {
   async roundStart() {
     this.round += 1;
     this.forEach(({ socket }) => socket.comm(GAME.SLEEP));
-    const shouldEnd = await this.wait(5000);
+    const shouldEnd = await this.wait(TIME);
     if (shouldEnd) return;
 
     this.roleAction = this.gameOrder.reduceRight(
@@ -156,9 +161,17 @@ class Game {
   }
 
   vote(voter, voteFor) {
-    if (!this.players[voter]) return;
-    if (this.players[voter].isDead) return;
-    if (this.end_result) return;
+    const { players, settings, end_result, current_role } = this;
+    if (!players[voter]) return;
+    if (players[voter].isDead) return;
+    if (end_result) return;
+    if (
+      current_role === ROLES.DOCTOR &&
+      players[voteFor].role === ROLES.DOCTOR &&
+      !settings.doctor_self
+    )
+      return;
+
     const round = this.history[this.round];
     if (!round) return;
     const voting = round[this.current_role];
@@ -169,9 +182,7 @@ class Game {
     const { tally, isVoteValid } = vote;
     const list = voting.list;
 
-    const voted = Object.keys(this.players).map((id) =>
-      (list[id] || []).slice(-3)
-    );
+    const voted = Object.keys(players).map((id) => (list[id] || []).slice(-3));
 
     this.forEach(({ socket }) =>
       socket.comm(GAME.VOTE, { isVoteValid, voted, tally })
@@ -184,19 +195,27 @@ class Game {
     if (isVoteValid) {
       this.timeout = setTimeout(() => {
         voting.seal();
-        this.timeout = null;
-
-        if (this.current_role === ROLES.EVERYONE) {
-          return this.reveal();
+        const votedFor = voting.final;
+        if (
+          this.current_role === ROLES.DOCTOR &&
+          votedFor &&
+          this.players[votedFor].role === ROLES.DOCTOR
+        ) {
+          this.settings.doctor_self -= 1;
         }
+        this.timeout = null;
         this.sleep();
-      }, 5000);
+      }, TIME);
     }
   }
 
   async sleep() {
+    if (this.current_role === ROLES.EVERYONE) {
+      return this.reveal();
+    }
+
     this.forEach(({ socket }) => socket.comm(GAME.SLEEP));
-    const shouldEnd = await this.wait(5000);
+    const shouldEnd = await this.wait(TIME);
     if (shouldEnd) return;
     this.roleAction = this.roleAction();
   }
@@ -234,7 +253,7 @@ class Game {
       { role: ROLES.EVERYONE }
     );
 
-    const shouldEnd = await this.wait(5000);
+    const shouldEnd = await this.wait(TIME);
     if (shouldEnd) return;
     if (!this.getResult()) {
       return this.wake(ROLES.EVERYONE);
@@ -248,7 +267,7 @@ class Game {
     const killed = this.history[this.round][ROLES.EVERYONE].final;
     if (!killed) {
       this.forEach(({ socket }) => socket.comm(GAME.REVEAL, { id: null }));
-      const shouldEnd = await this.wait(5000);
+      const shouldEnd = await this.wait(TIME);
       if (shouldEnd) return;
       return this.roundStart();
     }
@@ -272,11 +291,11 @@ class Game {
     });
 
     if (!this.getResult()) {
-      const shouldEnd = await this.wait(5000);
+      const shouldEnd = await this.wait(TIME);
       if (shouldEnd) return;
       return this.roundStart();
     }
-    const shouldEnd = await this.wait(5000);
+    const shouldEnd = await this.wait(TIME);
     if (shouldEnd) return;
     this.forEach(({ socket }) => socket.comm(GAME.END, this.end_result));
   }
