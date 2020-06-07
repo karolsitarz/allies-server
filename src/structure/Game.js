@@ -15,7 +15,7 @@ const ROLES_ORDER = [ROLES.MAFIA, ROLES.DOCTOR];
 
 const getShuffledPlayers = (players) => {
   const shuffled = shuffle(players);
-  const { roleCount } = generateRoles(players.length);
+  const roleCount = getRoles(players.length);
 
   const playerList = roleCount.reduce((acc, { count, role }) => {
     const mapped = shuffled
@@ -35,7 +35,7 @@ const getShuffledPlayers = (players) => {
 class Game {
   constructor(players) {
     this.players = getShuffledPlayers(players);
-    this.gameOrder = generateRoles(players.length).roleOrder;
+    this.gameOrder = getRoleOrder(players.length);
     this.current_role = ROLES.EVERYONE;
     this.round = -1;
     this.history = [];
@@ -306,7 +306,7 @@ class Game {
     let citizenAlive = false;
     Object.values(this.players).forEach(({ role, isDead }) => {
       mafiaAlive = mafiaAlive || (!isDead && role === ROLES.MAFIA);
-      citizenAlive = citizenAlive || (!isDead && role === ROLES.CITIZEN);
+      citizenAlive = citizenAlive || (!isDead && role !== ROLES.MAFIA);
     });
 
     if (mafiaAlive && citizenAlive) return;
@@ -320,49 +320,47 @@ class Game {
 module.exports = Game;
 module.exports.roles = ROLES;
 
-const generateRoles = (count) => {
-  const roleWeights = {
-    [ROLES.MAFIA]: {
-      priority: 5,
-      gain: 1.1,
-    },
-    [ROLES.DOCTOR]: {
-      priority: 11,
-      gain: 1.1,
-    },
-  };
-  const getCount = (role) =>
-    Math.round(
-      Math.pow(count, roleWeights[role].gain) / roleWeights[role].priority
-    );
+const ROLE_WEIGHTS = {
+  [ROLES.MAFIA]: {
+    priority: 5,
+    gain: 1.1,
+  },
+  [ROLES.DOCTOR]: {
+    priority: 11,
+    gain: 1.1,
+  },
+};
 
-  const { roleCount, roleOrder, citizenCount } = ROLES_ORDER.reduce(
-    (acc, role) => {
-      const count = getCount(role);
-      if (!count) return acc;
+const getRoleCount = (role, count) =>
+  Math.round(
+    Math.pow(count, ROLE_WEIGHTS[role].gain) / ROLE_WEIGHTS[role].priority
+  );
 
-      const { roleCount, roleOrder, citizenCount } = acc;
-      return {
-        roleCount: [...roleCount, { role, count }],
-        roleOrder: [...roleOrder, role],
-        citizenCount: citizenCount - count,
-      };
-    },
+const getRoles = (count) => {
+  const { roleCount, citizenCount } = ROLES_ORDER.reduce(
+    (acc, role) =>
+      !getRoleCount(role, count)
+        ? acc
+        : {
+            roleCount: [...acc.roleCount, { role, count }],
+            citizenCount: acc.citizenCount - count,
+          },
     {
       roleCount: [],
-      roleOrder: [],
       citizenCount: count,
     }
   );
 
-  return {
-    roleOrder,
-    roleCount: [
-      ...roleCount,
-      {
-        role: ROLES.CITIZEN,
-        count: citizenCount,
-      },
-    ],
-  };
+  return [
+    ...roleCount,
+    {
+      role: ROLES.CITIZEN,
+      count: citizenCount,
+    },
+  ];
 };
+
+const getRoleOrder = (count) =>
+  ROLES_ORDER.reduce((acc, role) =>
+    !getRoleCount(role, count) ? acc : [...acc, role]
+  );
