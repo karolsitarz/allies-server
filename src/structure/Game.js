@@ -3,7 +3,7 @@ const { GAME } = require('../util/msg');
 const Vote = require('./Vote');
 const { ROLES, getRoles, getRoleOrder } = require('./Roles');
 
-const { MAFIA, DOCTOR, CITIZEN, COP, EVERYONE } = ROLES;
+const { KILLER, DOCTOR, CITIZEN, COP, EVERYONE } = ROLES;
 const TIME = 5000;
 
 const getShuffledPlayers = (players) => {
@@ -191,7 +191,7 @@ class Game {
         ({ socket }) => {
           socket.comm(GAME.REVEAL, {
             id: votedFor,
-            role: players[votedFor].role === MAFIA && MAFIA,
+            role: players[votedFor].role === KILLER && KILLER,
             isDead: false,
           });
         },
@@ -220,7 +220,7 @@ class Game {
   async summary() {
     // TODO: a function for getting results
     const round = this.history[this.round];
-    let killed = [round[MAFIA].final];
+    let killed = [round[KILLER].final];
 
     if (round[DOCTOR]) {
       const healed = round[DOCTOR].final;
@@ -296,16 +296,16 @@ class Game {
 
   getResult() {
     if (this.end_result) return;
-    let mafiaAlive = false;
+    let killerAlive = false;
     let citizenAlive = false;
     Object.values(this.players).forEach(({ role, isDead }) => {
-      mafiaAlive = mafiaAlive || (!isDead && role === MAFIA);
-      citizenAlive = citizenAlive || (!isDead && role !== MAFIA);
+      killerAlive = killerAlive || (!isDead && role === KILLER);
+      citizenAlive = citizenAlive || (!isDead && role !== KILLER);
     });
 
-    if (mafiaAlive && citizenAlive) return;
-    if (mafiaAlive && !citizenAlive) this.end_result = MAFIA;
-    else if (!mafiaAlive && citizenAlive) this.end_result = CITIZEN;
+    if (killerAlive && citizenAlive) return;
+    if (killerAlive && !citizenAlive) this.end_result = KILLER;
+    else if (!killerAlive && citizenAlive) this.end_result = CITIZEN;
 
     return this.end_result;
   }

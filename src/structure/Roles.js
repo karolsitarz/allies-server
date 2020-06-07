@@ -1,15 +1,15 @@
 const ROLES = {
   EVERYONE: 'everyone',
-  MAFIA: 'mafia',
+  KILLER: 'killer',
   DOCTOR: 'doctor',
   COP: 'cop',
   CITIZEN: 'citizen',
 };
-const { MAFIA, DOCTOR, CITIZEN, COP } = ROLES;
-const ROLES_ORDER = [MAFIA, COP, DOCTOR];
+const { KILLER, DOCTOR, CITIZEN, COP } = ROLES;
+const ROLES_ORDER = [KILLER, COP, DOCTOR];
 
 const ROLE_WEIGHTS = {
-  [MAFIA]: {
+  [KILLER]: {
     priority: 5,
     gain: 1.1,
   },
