@@ -39,8 +39,9 @@ class User {
       try {
         const passed = data.data || {};
         callback(passed);
-      } catch ({ message }) {
-        this.comm(MSG.INFO, { message });
+      } catch (e) {
+        console.log(e.stack);
+        this.comm(MSG.INFO, { message: e.message });
       }
     });
   }

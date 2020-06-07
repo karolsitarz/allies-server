@@ -33,29 +33,41 @@ class Vote {
   }
 
   getTally() {
-    const { tally, voteCount, maxCount } = Object.keys(this.list).reduce(
-      (acc, current) => {
-        const count = this.list[current].length;
-        const { maxCount, tally } = acc;
-        const voteCount = acc.voteCount + count;
-        if (count < maxCount) return { ...acc, voteCount };
-        if (count === maxCount)
-          return { maxCount, voteCount, tally: [...tally, current] };
-        return { voteCount, maxCount: count, tally: [current] };
-      },
-      { maxCount: 0, tally: [], voteCount: 0 }
+    let mostVotes = 0;
+    let tally = [];
+    let voteCount = 0;
+    Object.keys(this.list).forEach((current) => {
+      const count = this.list[current].length;
+      voteCount += count;
+
+      if (count < mostVotes) return;
+      if (count === mostVotes) {
+        tally = [...tally, current];
+        return;
+      }
+      mostVotes = count;
+      tally = [current];
+    });
+
+    const voted = Object.entries(this.list).reduce(
+      (acc, [id, list]) => ({
+        ...acc,
+        [id]: list.slice(-3),
+      }),
+      {}
     );
 
-    if (maxCount === 0)
+    if (!mostVotes)
       return {
         tally: [],
         isVoteValid: false,
+        voted,
       };
 
-    const unanimousTally = this.unanimous && tally.length > 1 ? [] : tally;
     return {
-      tally: unanimousTally,
+      tally: this.unanimous && tally.length > 1 ? [] : tally,
       isVoteValid: voteCount === this.voters._length,
+      voted,
     };
   }
 
