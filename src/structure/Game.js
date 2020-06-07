@@ -38,7 +38,7 @@ class Game {
     this.end_result = null;
     this.is_interrupted = false;
     this.settings = {
-      doctor_self: 2,
+      doctor_self_heal: 2,
     };
   }
 
@@ -103,11 +103,11 @@ class Game {
     this.roleAction = this.gameOrder.reduceRight(
       (acc, current) => () => {
         this.wake(current);
-        return acc;
+        this.roleAction = acc;
       },
       () => this.summary()
     );
-    this.roleAction = this.roleAction();
+    this.roleAction();
   }
 
   async wake(role) {
@@ -123,8 +123,7 @@ class Game {
         const time = Math.random() * (20 - 7) + 7;
         const shouldEnd = await this.wait(time * 1000);
         if (shouldEnd) return;
-        this.roleAction = this.roleAction();
-        return;
+        return this.roleAction();
       }
     }
 
@@ -154,7 +153,7 @@ class Game {
     if (
       role === DOCTOR &&
       players[voteFor].role === DOCTOR &&
-      !settings.doctor_self
+      !settings.doctor_self_heal
     )
       return;
     // if a cop tries to interrogate a cop
@@ -182,7 +181,7 @@ class Game {
 
     // subtract from the self-heal doctor limit
     if (role === DOCTOR && players[votedFor].role === DOCTOR) {
-      this.settings.doctor_self -= 1;
+      this.settings.doctor_self_heal -= 1;
     }
 
     // reveal the role to the cops
@@ -214,7 +213,7 @@ class Game {
     this.forEach(({ socket }) => socket.comm(GAME.SLEEP));
     const shouldEnd = await this.wait(TIME);
     if (shouldEnd) return;
-    this.roleAction = this.roleAction();
+    this.roleAction();
   }
 
   async summary() {

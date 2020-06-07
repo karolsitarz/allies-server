@@ -10,22 +10,22 @@ const ROLES_ORDER = [KILLER, COP, DOCTOR];
 
 const ROLE_WEIGHTS = {
   [KILLER]: {
-    priority: 5,
+    priority: 4.5,
     gain: 1.1,
   },
   [DOCTOR]: {
-    priority: 11,
-    gain: 1.1,
+    priority: 9,
+    gain: 1,
   },
   [COP]: {
-    priority: 12,
+    priority: 9.5,
     gain: 1.1,
   },
 };
 
 const getRoleCount = (role, count) =>
   Math.round(
-    Math.pow(count, ROLE_WEIGHTS[role].gain) / ROLE_WEIGHTS[role].priority
+    Math.pow(count / ROLE_WEIGHTS[role].priority, ROLE_WEIGHTS[role].gain)
   );
 
 const getRoles = (count) => {
