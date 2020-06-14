@@ -4,9 +4,13 @@ const ROLES = {
   DOCTOR: 'doctor',
   COP: 'cop',
   CITIZEN: 'citizen',
+  NITWIT: 'nitwit',
+  CABBY: 'cabby',
+  SNIPER: 'sniper',
 };
-const { KILLER, DOCTOR, CITIZEN, COP } = ROLES;
-const ROLES_ORDER = [KILLER, COP, DOCTOR];
+const { KILLER, DOCTOR, CITIZEN, COP, NITWIT, CABBY, SNIPER } = ROLES;
+const ROLES_ORDER = [KILLER, COP, DOCTOR, SNIPER];
+const ROLES_VOTE_SKIP = [SNIPER, NITWIT];
 
 const ROLE_WEIGHTS = {
   [KILLER]: {
@@ -20,6 +24,18 @@ const ROLE_WEIGHTS = {
   [COP]: {
     priority: 9.5,
     gain: 1.1,
+  },
+  [NITWIT]: {
+    priority: 4.5,
+    gain: 1.1,
+  },
+  [CABBY]: {
+    priority: 15,
+    gain: 1.1,
+  },
+  [SNIPER]: {
+    priority: 13,
+    gain: 1.75,
   },
 };
 
@@ -52,8 +68,9 @@ const getRoleOrder = (count) =>
   ROLES_ORDER.reduce(
     (acc, role) => (!getRoleCount(role, count) ? acc : [...acc, role]),
     []
-  );
+  ).filter((role) => role !== NITWIT);
 
 module.exports.ROLES = ROLES;
 module.exports.getRoles = getRoles;
 module.exports.getRoleOrder = getRoleOrder;
+module.exports.ROLES_VOTE_SKIP = ROLES_VOTE_SKIP;

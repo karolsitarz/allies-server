@@ -1,10 +1,11 @@
 const shuffle = require('fisher-yates');
 const { GAME } = require('../util/msg');
 const Vote = require('./Vote');
-const { ROLES, getRoles, getRoleOrder } = require('./Roles');
+const { ROLES, getRoles, getRoleOrder, ROLES_VOTE_SKIP } = require('./Roles');
 
-const { KILLER, DOCTOR, CITIZEN, COP, EVERYONE } = ROLES;
-const TIME = 5000;
+const SKIP = 'SKIP';
+const { KILLER, DOCTOR, CITIZEN, COP, EVERYONE, SNIPER } = ROLES;
+const TIME = 4000;
 
 const getShuffledPlayers = (players) => {
   const shuffled = shuffle(players);
@@ -39,6 +40,8 @@ class Game {
     this.is_interrupted = false;
     this.settings = {
       doctor_self_heal: 2,
+      nitwits_know_each_other: false,
+      sniper_shot: 1,
     };
   }
 
@@ -126,6 +129,7 @@ class Game {
         return this.roleAction();
       }
     }
+    const canSkipVote = ROLES_VOTE_SKIP.includes(role);
 
     const alive = Object.entries(this.players)
       .filter(([, { isDead }]) => !isDead)
@@ -134,21 +138,28 @@ class Game {
       role === EVERYONE
         ? alive
         : alive.filter((id) => this.players[id].role === role);
+    const list = canSkipVote ? [...alive, SKIP] : alive;
+
     this.history[this.round][this.role] = new Vote(
-      alive,
+      list,
       awake,
       this.role === EVERYONE
     );
 
     const message =
       (this.role === EVERYONE ? 'day' : 'night') + ' ' + (this.round + 1);
-    this.forEach(({ socket }) => socket.comm(GAME.WAKE, message));
+
+    this.forEach(({ socket }) =>
+      socket.comm(GAME.WAKE, { message, canSkipVote })
+    );
   }
 
   vote(voter, voteFor) {
     const { players, settings, end_result, role } = this;
     if (end_result) return;
     if (!players[voter] || players[voter].isDead) return;
+    // if can't skip and wants to skip
+    if (!ROLES_VOTE_SKIP.includes(role) && voteFor === SKIP) return;
     // if a doctor tries to heal a doctor, past the self-heal limit
     if (
       role === DOCTOR &&
@@ -158,6 +169,9 @@ class Game {
       return;
     // if a cop tries to interrogate a cop
     if (role === COP && players[voteFor].role === COP) return;
+    // if a sniper tries to shoot a sniper
+    if (role === SNIPER && voteFor !== SKIP && players[voteFor].role === SNIPER)
+      return;
 
     const voting = this.history[this.round][this.role];
     if (!voting) return;
@@ -216,15 +230,33 @@ class Game {
     this.roleAction();
   }
 
-  async summary() {
-    // TODO: a function for getting results
+  getFatalities() {
     const round = this.history[this.round];
-    let killed = [round[KILLER].final];
+    // add mafia fatalities to killed
+    const killed = round[KILLER].final;
+    const healed = round[DOCTOR] && round[DOCTOR].final;
+    const sniped = round[SNIPER] && round[SNIPER].final;
 
-    if (round[DOCTOR]) {
-      const healed = round[DOCTOR].final;
-      killed = killed.filter((player) => player != healed);
+    let fatalities = [killed];
+
+    // if sniped wasn't healed, add casualties
+    if (sniped && sniped !== SKIP && sniped != healed) {
+      fatalities = [...fatalities, sniped];
+      if (this.players[sniped].role !== KILLER) {
+        const snipers = Object.entries(this.players)
+          .filter(([, { role, isDead }]) => !isDead && role === SNIPER)
+          .map(([id]) => id);
+        fatalities = [...fatalities, ...snipers];
+      }
     }
+
+    // heal fatalities
+    fatalities = fatalities.filter((player) => player != healed);
+    return [...new Set(fatalities)];
+  }
+
+  async summary() {
+    const killed = this.getFatalities();
 
     const revealedRoles = Object.entries(this.players).reduce(
       (acc, [id, { role }]) => ({ ...acc, [id]: role }),
