@@ -9,7 +9,7 @@ const ROLES = {
   SNIPER: 'sniper',
 };
 const { KILLER, DOCTOR, CITIZEN, COP, NITWIT, CABBY, SNIPER } = ROLES;
-const ROLES_ORDER = [KILLER, COP, DOCTOR, SNIPER];
+const ROLES_ORDER = [KILLER, COP, DOCTOR, SNIPER, NITWIT];
 const ROLES_VOTE_SKIP = [SNIPER, NITWIT];
 
 const ROLE_WEIGHTS = {
@@ -26,8 +26,8 @@ const ROLE_WEIGHTS = {
     gain: 1.1,
   },
   [NITWIT]: {
-    priority: 4.5,
-    gain: 1.1,
+    priority: 10,
+    gain: 1.75,
   },
   [CABBY]: {
     priority: 15,

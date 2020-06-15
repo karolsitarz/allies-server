@@ -4,7 +4,7 @@ const Vote = require('./Vote');
 const { ROLES, getRoles, getRoleOrder, ROLES_VOTE_SKIP } = require('./Roles');
 
 const SKIP = 'SKIP';
-const { KILLER, DOCTOR, CITIZEN, COP, EVERYONE, SNIPER } = ROLES;
+const { KILLER, DOCTOR, CITIZEN, COP, EVERYONE, SNIPER, CABBY } = ROLES;
 const TIME = 4000;
 
 const getShuffledPlayers = (players) => {
@@ -87,7 +87,7 @@ class Game {
       socket.comm(GAME.START, players);
     });
 
-    const shouldEnd = await this.wait(TIME * 2);
+    const shouldEnd = await this.wait(TIME * 1.5);
     if (shouldEnd) return;
     this.roundStart();
   }
@@ -156,7 +156,7 @@ class Game {
 
   vote(voter, voteFor) {
     const { players, settings, end_result, role } = this;
-    if (end_result) return;
+    if (end_result !== null) return;
     if (!players[voter] || players[voter].isDead) return;
     // if can't skip and wants to skip
     if (!ROLES_VOTE_SKIP.includes(role) && voteFor === SKIP) return;
@@ -232,15 +232,15 @@ class Game {
 
   getFatalities() {
     const round = this.history[this.round];
-    // add mafia fatalities to killed
     const killed = round[KILLER].final;
     const healed = round[DOCTOR] && round[DOCTOR].final;
     const sniped = round[SNIPER] && round[SNIPER].final;
 
+    // add mafia killed to fatalities
     let fatalities = [killed];
 
-    // if sniped wasn't healed, add casualties
-    if (sniped && sniped !== SKIP && sniped != healed) {
+    // if sniped wasn't healed, add fatalities
+    if (sniped && sniped !== SKIP && sniped !== healed) {
       fatalities = [...fatalities, sniped];
       if (this.players[sniped].role !== KILLER) {
         const snipers = Object.entries(this.players)
@@ -251,7 +251,7 @@ class Game {
     }
 
     // heal fatalities
-    fatalities = fatalities.filter((player) => player != healed);
+    fatalities = fatalities.filter((player) => player !== healed);
     return [...new Set(fatalities)];
   }
 
@@ -282,7 +282,7 @@ class Game {
 
     const shouldEnd = await this.wait(TIME);
     if (shouldEnd) return;
-    if (!this.getResult()) {
+    if (this.getResult() === null) {
       return this.wake(EVERYONE);
     }
     this.forEach(({ socket }) => socket.comm(GAME.END, this.end_result));
@@ -290,6 +290,7 @@ class Game {
 
   async reveal() {
     const killed = this.history[this.round][EVERYONE].final;
+    // if no one was killed
     if (!killed) {
       this.forEach(({ socket }) => socket.comm(GAME.REVEAL, { id: null }));
       const shouldEnd = await this.wait(TIME);
@@ -297,9 +298,11 @@ class Game {
       return this.roundStart();
     }
 
+    // kill the player
     this.players[killed].isDead = true;
     const { role } = this.players[killed];
 
+    // show killed players all the roles
     const players = Object.entries(this.players).reduce(
       (acc, [id, { role }]) => ({ ...acc, [id]: role }),
       {}
@@ -310,33 +313,41 @@ class Game {
         killed: [killed],
         players,
       });
+    // reveal killed players' role
     this.forEach(({ socket, id }) => {
       if (killed === id) return;
       socket.comm(GAME.REVEAL, { id: killed, role, isDead: true });
     });
 
-    if (!this.getResult()) {
-      const shouldEnd = await this.wait(TIME);
-      if (shouldEnd) return;
-      return this.roundStart();
-    }
     const shouldEnd = await this.wait(TIME);
     if (shouldEnd) return;
-    this.forEach(({ socket }) => socket.comm(GAME.END, this.end_result));
+
+    // if the game's over, end it
+    if (this.getResult() !== null) {
+      this.forEach(({ socket }) => socket.comm(GAME.END, this.end_result));
+      return;
+    }
+    // continue
+    this.roundStart();
   }
 
   getResult() {
-    if (this.end_result) return;
-    let killerAlive = false;
-    let citizenAlive = false;
-    Object.values(this.players).forEach(({ role, isDead }) => {
-      killerAlive = killerAlive || (!isDead && role === KILLER);
-      citizenAlive = citizenAlive || (!isDead && role !== KILLER);
-    });
+    if (this.end_result !== null) return this.end_result;
+    const alive = Object.values(this.players).filter(({ isDead }) => !isDead);
+    const killerAlive = alive.find(({ role }) => role === KILLER);
+    const citizenAlive = alive.find(({ role }) => role !== KILLER);
 
-    if (killerAlive && citizenAlive) return;
-    if (killerAlive && !citizenAlive) this.end_result = KILLER;
-    else if (!killerAlive && citizenAlive) this.end_result = CITIZEN;
+    if (killerAlive && citizenAlive) {
+      // if two players - mafia and cabby => tie
+      if (alive.length !== 2) return this.end_result;
+      if (!alive.find(({ role }) => role === CABBY)) return this.end_result;
+      this.end_result = 0;
+      return this.end_result;
+    }
+
+    if (killerAlive && !citizenAlive) this.end_result = -1;
+    else if (!killerAlive && citizenAlive) this.end_result = 1;
+    else if (!killerAlive && !citizenAlive) this.end_result = 0;
 
     return this.end_result;
   }
