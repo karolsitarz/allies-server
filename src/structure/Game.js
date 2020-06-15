@@ -40,7 +40,6 @@ class Game {
     this.is_interrupted = false;
     this.settings = {
       doctor_self_heal: 2,
-      nitwits_know_each_other: false,
       sniper_shot: 1,
     };
   }
@@ -115,10 +114,11 @@ class Game {
 
   async wake(role) {
     this.role = role;
+    const { round, players } = this;
 
-    if (this.role !== EVERYONE) {
+    if (role !== EVERYONE) {
       // check if there are any alive with current role
-      const aliveRole = Object.values(this.players).find(
+      const aliveRole = Object.values(players).find(
         ({ role, isDead }) => !isDead && role === this.role
       );
       // if not, randomize waiting time
@@ -129,25 +129,28 @@ class Game {
         return this.roleAction();
       }
     }
+    // don't wake unnecessary snipers
+    if (role === SNIPER && !this.settings.sniper_shot) {
+      const time = Math.random() * (20 - 7) + 7;
+      const shouldEnd = await this.wait(time * 1000);
+      if (shouldEnd) return;
+      return this.roleAction();
+    }
+
     const canSkipVote = ROLES_VOTE_SKIP.includes(role);
 
-    const alive = Object.entries(this.players)
+    const alive = Object.entries(players)
       .filter(([, { isDead }]) => !isDead)
       .map(([id]) => id);
     const awake =
       role === EVERYONE
         ? alive
-        : alive.filter((id) => this.players[id].role === role);
+        : alive.filter((id) => players[id].role === role);
     const list = canSkipVote ? [...alive, SKIP] : alive;
 
-    this.history[this.round][this.role] = new Vote(
-      list,
-      awake,
-      this.role === EVERYONE
-    );
+    this.history[round][role] = new Vote(list, awake, role === EVERYONE);
 
-    const message =
-      (this.role === EVERYONE ? 'day' : 'night') + ' ' + (this.round + 1);
+    const message = (role === EVERYONE ? 'day' : 'night') + ' ' + (round + 1);
 
     this.forEach(({ socket }) =>
       socket.comm(GAME.WAKE, { message, canSkipVote })
@@ -172,6 +175,8 @@ class Game {
     // if a sniper tries to shoot a sniper
     if (role === SNIPER && voteFor !== SKIP && players[voteFor].role === SNIPER)
       return;
+    // if a sniper tries to shoot more than once
+    if (role === SNIPER && voteFor !== SKIP && !settings.sniper_shot) return;
 
     const voting = this.history[this.round][this.role];
     if (!voting) return;
@@ -213,6 +218,11 @@ class Game {
 
       const shouldEnd = await this.wait(TIME);
       if (shouldEnd) return;
+    }
+
+    // subtract from the sniper shoot limit
+    if (role === SNIPER && votedFor !== SKIP) {
+      this.settings.sniper_shot -= 1;
     }
 
     this.timeout = null;
