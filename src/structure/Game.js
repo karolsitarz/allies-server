@@ -4,7 +4,16 @@ const Vote = require('./Vote');
 const { ROLES, getRoles, getRoleOrder, ROLES_VOTE_SKIP } = require('./Roles');
 
 const SKIP = 'SKIP';
-const { KILLER, DOCTOR, CITIZEN, COP, EVERYONE, SNIPER, CABBY } = ROLES;
+const {
+  KILLER,
+  DOCTOR,
+  CITIZEN,
+  COP,
+  EVERYONE,
+  SNIPER,
+  CABBY,
+  NOT_KILLER,
+} = ROLES;
 const TIME = 4000;
 
 const getShuffledPlayers = (players) => {
@@ -177,6 +186,8 @@ class Game {
       return;
     // if a sniper tries to shoot more than once
     if (role === SNIPER && voteFor !== SKIP && !settings.sniper_shot) return;
+    // if a cabby tries to drive himself out
+    if (role === CABBY && players[voteFor].role === CABBY) return;
 
     const voting = this.history[this.round][this.role];
     if (!voting) return;
@@ -205,11 +216,25 @@ class Game {
 
     // reveal the role to the cops
     if (role === COP) {
+      const round = this.history[this.round];
+      const blocked = round[CABBY] && round[CABBY].final;
+      const aliveCops = Object.entries(players).filter(
+        ([, { role, isDead }]) => !isDead && role === COP
+      ).length;
+
+      const isBlocked =
+        blocked &&
+        ((aliveCops === 1 && players[blocked].role === COP) ||
+          votedFor === blocked);
+
+      const sharedRoles =
+        !isBlocked && (players[votedFor].role === KILLER ? KILLER : NOT_KILLER);
+
       this.forEach(
         ({ socket }) => {
           socket.comm(GAME.REVEAL, {
             id: votedFor,
-            role: players[votedFor].role === KILLER && KILLER,
+            role: sharedRoles,
             isDead: false,
           });
         },
@@ -241,27 +266,53 @@ class Game {
   }
 
   getFatalities() {
+    const { players } = this;
     const round = this.history[this.round];
+    const alive = Object.entries(players).filter(([, { isDead }]) => !isDead);
     const killed = round[KILLER].final;
     const healed = round[DOCTOR] && round[DOCTOR].final;
     const sniped = round[SNIPER] && round[SNIPER].final;
+    const blocked = round[CABBY] && round[CABBY].final;
 
-    // add mafia killed to fatalities
-    let fatalities = [killed];
+    const isBlocked = (blockedRole) => {
+      const targeted = round[blockedRole] && round[blockedRole].final;
+      const count = alive.filter(([, { role }]) => role === blockedRole).length;
+      return (
+        blocked &&
+        targeted &&
+        ((count === 1 && players[blocked].role === blockedRole) ||
+          targeted === blocked)
+      );
+    };
 
-    // if sniped wasn't healed, add fatalities
-    if (sniped && sniped !== SKIP && sniped !== healed) {
-      fatalities = [...fatalities, sniped];
-      if (this.players[sniped].role !== KILLER) {
-        const snipers = Object.entries(this.players)
-          .filter(([, { role, isDead }]) => !isDead && role === SNIPER)
-          .map(([id]) => id);
-        fatalities = [...fatalities, ...snipers];
+    let fatalities = [];
+
+    // if killer isn't blocked
+    if (!isBlocked(KILLER)) {
+      // add fatalities
+      fatalities = [killed];
+    }
+
+    // if sniper didn't skip and isn't blocked
+    if (sniped && sniped !== SKIP && !isBlocked(SNIPER)) {
+      // if sniped wasn't healed (if it was, then if the doctor was blocked)
+      if (sniped !== healed || isBlocked(DOCTOR)) {
+        fatalities = [...fatalities, sniped];
+
+        // if the sniped wasn't a killer, snipers die as well
+        if (players[sniped].role !== KILLER) {
+          const snipers = Object.entries(players)
+            .filter(([, { role, isDead }]) => !isDead && role === SNIPER)
+            .map(([id]) => id);
+          fatalities = [...fatalities, ...snipers];
+        }
       }
     }
 
     // heal fatalities
-    fatalities = fatalities.filter((player) => player !== healed);
+    if (healed && !isBlocked(DOCTOR)) {
+      fatalities = fatalities.filter((player) => player !== healed);
+    }
     return [...new Set(fatalities)];
   }
 
@@ -348,10 +399,10 @@ class Game {
     const citizenAlive = alive.find(({ role }) => role !== KILLER);
 
     if (killerAlive && citizenAlive) {
-      // if two players - mafia and cabby => tie
+      // if two players - mafia and cabby => mafia wins
       if (alive.length !== 2) return this.end_result;
       if (!alive.find(({ role }) => role === CABBY)) return this.end_result;
-      this.end_result = 0;
+      this.end_result = -1;
       return this.end_result;
     }
 
