@@ -21,6 +21,8 @@ const MSG = {
     SUMMARY: 'GAME_SUMMARY',
     REVEAL: 'GAME_REVEAL',
   },
+  SOUND_WAKE: 'SOUND_WAKE',
+  SOUND_SLEEP: 'SOUND_SLEEP',
 };
 
 module.exports = MSG;

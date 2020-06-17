@@ -1,5 +1,5 @@
 const shuffle = require('fisher-yates');
-const { GAME } = require('../util/msg');
+const { GAME, SOUND_WAKE, SOUND_SLEEP } = require('../util/msg');
 const Vote = require('./Vote');
 const { ROLES, getRoles, getRoleOrder, ROLES_VOTE_SKIP } = require('./Roles');
 
@@ -36,7 +36,9 @@ const getShuffledPlayers = (players) => {
   );
 };
 class Game {
-  constructor(players) {
+  constructor(room) {
+    const players = room.players;
+    this.room = room;
     this.players = getShuffledPlayers(players);
     this.gameOrder = getRoleOrder(players.length);
 
@@ -103,6 +105,8 @@ class Game {
   async roundStart() {
     this.round += 1;
     this.forEach(({ socket }) => socket.comm(GAME.SLEEP));
+    global.USERS[this.room.host].comm(SOUND_SLEEP, EVERYONE);
+
     const shouldEnd = await this.wait(TIME);
     if (shouldEnd) return;
 
@@ -125,6 +129,8 @@ class Game {
     this.role = role;
     const { round, players } = this;
 
+    role !== EVERYONE && global.USERS[this.room.host].comm(SOUND_WAKE, role);
+
     if (role !== EVERYONE) {
       // check if there are any alive with current role
       const aliveRole = Object.values(players).find(
@@ -135,7 +141,7 @@ class Game {
         const time = Math.random() * (20 - 7) + 7;
         const shouldEnd = await this.wait(time * 1000);
         if (shouldEnd) return;
-        return this.roleAction();
+        return this.sleep();
       }
     }
     // don't wake unnecessary snipers
@@ -143,7 +149,7 @@ class Game {
       const time = Math.random() * (20 - 7) + 7;
       const shouldEnd = await this.wait(time * 1000);
       if (shouldEnd) return;
-      return this.roleAction();
+      return this.sleep();
     }
 
     const canSkipVote = ROLES_VOTE_SKIP.includes(role);
@@ -255,9 +261,11 @@ class Game {
   }
 
   async sleep() {
-    if (this.role === EVERYONE) {
+    const { role } = this;
+    if (role === EVERYONE) {
       return this.reveal();
     }
+    role !== EVERYONE && global.USERS[this.room.host].comm(SOUND_SLEEP, role);
 
     this.forEach(({ socket }) => socket.comm(GAME.SLEEP));
     const shouldEnd = await this.wait(TIME);
@@ -318,6 +326,7 @@ class Game {
 
   async summary() {
     const killed = this.getFatalities();
+    global.USERS[this.room.host].comm(SOUND_WAKE, EVERYONE);
 
     const revealedRoles = Object.entries(this.players).reduce(
       (acc, [id, { role }]) => ({ ...acc, [id]: role }),

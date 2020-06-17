@@ -85,7 +85,7 @@ class Room {
     if (this.players.find(({ isReady }) => !isReady))
       throw new Error('Not everyone is ready');
 
-    this.game = new Game(this.players);
+    this.game = new Game(this);
     this.players = this.players.map((player) => ({
       ...player,
       isReady: false,
