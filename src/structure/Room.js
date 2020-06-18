@@ -2,6 +2,8 @@ const randomize = require('randomatic');
 const Game = require('./Game');
 
 const { ROOM } = require('../util/msg');
+const SETTINGS_ROLES = ['killer', 'doctor', 'cop', 'nitwit', 'cabby', 'sniper'];
+
 class Room {
   constructor() {
     const id = randomize('A', 5);
@@ -9,6 +11,15 @@ class Room {
     this.players = [];
     this.host = null;
     this.game = null;
+    this.settings = {
+      auto: true,
+      killer: 1,
+      doctor: 0,
+      cop: 0,
+      nitwit: 0,
+      cabby: 0,
+      sniper: 0,
+    };
   }
 
   commAll(message, data) {
@@ -42,6 +53,7 @@ class Room {
       delete global.ROOMS[this.id];
     } else if (this.host === user.id) {
       this.host = this.players[0].id;
+      global.USERS[this.host].comm(ROOM.SETTINGS.RECEIVE, this.settings);
     }
 
     user.comm(ROOM.LEAVE);
@@ -82,6 +94,14 @@ class Room {
     if (this.host !== user.id) throw new Error('User is not a host');
     if (this.players.length < 4)
       throw new Error('Minimum 4 players required to start the game');
+    if (!this.settings.auto) {
+      const min = SETTINGS_ROLES.reduce(
+        (acc, role) => acc + this.settings[role],
+        0
+      );
+      if (this.players.length < min)
+        throw new Error(`Minimum ${min} players required to start the game`);
+    }
     if (this.players.find(({ isReady }) => !isReady))
       throw new Error('Not everyone is ready');
 
@@ -92,6 +112,28 @@ class Room {
     }));
     this.game.start();
     this.commAll(ROOM.UPDATE, this.getPlayers());
+  }
+
+  setSettings(settings, user) {
+    if (this.host !== user.id) throw new Error('User is not a host');
+    const { auto } = settings;
+    if (auto) {
+      if (this.settings.auto) return;
+      this.settings.auto = true;
+      user.comm(ROOM.SETTINGS.RECEIVE, { auto: this.settings.auto });
+    }
+
+    let min = 0;
+    for (let role of SETTINGS_ROLES) {
+      if (isNaN(settings[role])) return;
+      if (settings[role] > 10) return;
+      min += settings[role];
+    }
+    if (min > 20) return;
+
+    this.settings.auto = false;
+    SETTINGS_ROLES.forEach((role) => (this.settings[role] = settings[role]));
+    user.comm(ROOM.SETTINGS.RECEIVE, this.settings);
   }
 }
 

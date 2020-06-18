@@ -16,9 +16,9 @@ const {
 } = ROLES;
 const TIME = 4000;
 
-const getShuffledPlayers = (players) => {
+const getShuffledPlayers = (players, settings) => {
   const shuffled = shuffle(players);
-  const roleCount = getRoles(players.length);
+  const roleCount = getRoles(players.length, settings);
 
   const playerList = roleCount.reduce((acc, { count, role }) => {
     const mapped = shuffled
@@ -39,8 +39,10 @@ class Game {
   constructor(room) {
     const players = room.players;
     this.room = room;
-    this.players = getShuffledPlayers(players);
-    this.gameOrder = getRoleOrder(players.length);
+    const { auto, ...settings } = room.settings;
+    const roomSettings = !auto && settings;
+    this.players = getShuffledPlayers(players, roomSettings);
+    this.gameOrder = getRoleOrder(players.length, roomSettings);
 
     this.role = EVERYONE;
     this.round = -1;

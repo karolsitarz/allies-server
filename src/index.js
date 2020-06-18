@@ -80,6 +80,14 @@ app.ws('/', (socket) => {
     room.leave(user);
   });
 
+  user.receive(MSG.ROOM.SETTINGS.SEND, (settings) => {
+    if (!user.current_room) throw new Error('User is not in any room');
+    const room = global.ROOMS[user.current_room];
+    if (!room) throw new Error('User is not in a valid room');
+
+    room.setSettings(settings, user);
+  });
+
   user.receive(MSG.GAME.START, () => {
     if (!user.current_room) throw new Error('User is not in any room');
     const room = global.ROOMS[user.current_room];

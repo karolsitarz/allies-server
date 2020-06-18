@@ -11,6 +11,10 @@ const MSG = {
     LEAVE: 'ROOM_LEAVE',
     UPDATE: 'ROOM_UPDATE',
     READY: 'ROOM_READY',
+    SETTINGS: {
+      SEND: 'ROOM_SETTINGS_SEND',
+      RECEIVE: 'ROOM_SETTINGS_RECEIVE',
+    },
   },
   GAME: {
     START: 'GAME_START',
