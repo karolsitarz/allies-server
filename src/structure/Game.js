@@ -1,5 +1,5 @@
 const shuffle = require('fisher-yates');
-const { GAME, SOUND_WAKE, SOUND_SLEEP } = require('../util/msg');
+const { GAME, SOUND } = require('../util/msg');
 const Vote = require('./Vote');
 const { ROLES, getRoles, getRoleOrder, ROLES_VOTE_SKIP } = require('./Roles');
 
@@ -105,7 +105,7 @@ class Game {
   async roundStart() {
     this.round += 1;
     this.forEach(({ socket }) => socket.comm(GAME.SLEEP));
-    global.USERS[this.room.host].comm(SOUND_SLEEP, EVERYONE);
+    global.USERS[this.room.host].comm(SOUND.SLEEP, EVERYONE);
 
     const shouldEnd = await this.wait(TIME);
     if (shouldEnd) return;
@@ -129,7 +129,7 @@ class Game {
     this.role = role;
     const { round, players } = this;
 
-    role !== EVERYONE && global.USERS[this.room.host].comm(SOUND_WAKE, role);
+    role !== EVERYONE && global.USERS[this.room.host].comm(SOUND.WAKE, role);
 
     if (role !== EVERYONE) {
       // check if there are any alive with current role
@@ -265,7 +265,7 @@ class Game {
     if (role === EVERYONE) {
       return this.reveal();
     }
-    role !== EVERYONE && global.USERS[this.room.host].comm(SOUND_SLEEP, role);
+    role !== EVERYONE && global.USERS[this.room.host].comm(SOUND.SLEEP, role);
 
     this.forEach(({ socket }) => socket.comm(GAME.SLEEP));
     const shouldEnd = await this.wait(TIME);
@@ -326,7 +326,7 @@ class Game {
 
   async summary() {
     const killed = this.getFatalities();
-    global.USERS[this.room.host].comm(SOUND_WAKE, EVERYONE);
+    global.USERS[this.room.host].comm(SOUND.WAKE, EVERYONE);
 
     const revealedRoles = Object.entries(this.players).reduce(
       (acc, [id, { role }]) => ({ ...acc, [id]: role }),
