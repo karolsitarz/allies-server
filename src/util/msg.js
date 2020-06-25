@@ -29,6 +29,10 @@ const MSG = {
     WAKE: 'SOUND_WAKE',
     SLEEP: 'SOUND_SLEEP',
   },
+  CONNECTION: {
+    PING: 'CONNECTION_PING',
+    PONG: 'CONNECTION_PONG',
+  },
 };
 
 module.exports = MSG;

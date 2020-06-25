@@ -29,6 +29,10 @@ app.ws('/', (socket) => {
     console.DLog('DISCONNECT', uid);
   });
 
+  user.receive(MSG.CONNECTION.PING, (ping) => {
+    user.comm(MSG.CONNECTION.PONG, ping);
+  });
+
   user.receive(MSG.LOGIN.PROMPT, ({ name, emoji }) => {
     if (user.name) throw new Error('User already logged in.');
     if (typeof name !== 'string') throw new Error('Name is not a string.');
