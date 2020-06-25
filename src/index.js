@@ -8,7 +8,6 @@ const User = require('./structure/User');
 const Room = require('./structure/Room');
 const MSG = require('./util/msg');
 
-const ipaddress = process.env.IP || require('ip').address() || '127.0.0.1';
 const port = process.env.PORT || 443;
 
 global.ROOMS = {};
@@ -108,6 +107,4 @@ app.ws('/', (socket) => {
 });
 
 // open server
-app.listen(port, ipaddress, () =>
-  console.log(`server listening on ${ipaddress}:${port}`)
-);
+app.listen(port, () => console.log(`server listening on port ${port}`));
