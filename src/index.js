@@ -34,12 +34,16 @@ app.ws('/', (socket) => {
   });
 
   user.receive(MSG.LOGIN.PROMPT, ({ name, emoji }) => {
-    if (user.name) throw new Error('User already logged in.');
-    if (typeof name !== 'string') throw new Error('Name is not a string.');
-    if (!name.length) throw new Error('Name is too short.');
-    if (name.length > 20) throw new Error('Name is too long.');
-    const regex = emojiRegex().test(emoji);
-    if (!regex) throw new Error('Invalid emoji.');
+    try {
+      if (user.name) throw new Error('User already logged in.');
+      if (typeof name !== 'string') throw new Error('Name is not a string.');
+      if (!name.length) throw new Error('Name is too short.');
+      if (name.length > 20) throw new Error('Name is too long.');
+      const regex = emojiRegex().test(emoji);
+      if (!regex) throw new Error('Invalid emoji.');
+    } catch ({ message }) {
+      user.comm(MSG.INFO, { message });
+    }
 
     user.name = name;
     user.emoji = emoji;
@@ -47,7 +51,11 @@ app.ws('/', (socket) => {
   });
 
   user.receive(MSG.ROOM.CREATE, () => {
-    if (user.current_room) throw new Error('User is already in a room');
+    try {
+      if (user.current_room) throw new Error('User is already in a room');
+    } catch ({ message }) {
+      user.comm(MSG.INFO, { message });
+    }
 
     const room = new Room();
     const { id } = room;
@@ -59,54 +67,83 @@ app.ws('/', (socket) => {
 
   user.receive(MSG.ROOM.JOIN, (id) => {
     const room = global.ROOMS[id];
-    if (!room) throw new Error('Room does not exist.');
+    try {
+      if (!room) throw new Error('Room does not exist.');
+    } catch ({ message }) {
+      user.comm(MSG.INFO, { message });
+    }
 
     room.join(user);
   });
 
   user.receive(MSG.ROOM.READY, () => {
-    if (!user.current_room) throw new Error('User is not in a room.');
-    const room = global.ROOMS[user.current_room];
-    if (!room) throw new Error('User is not in a valid room.');
+    let room;
+    try {
+      if (!user.current_room) throw new Error('User is not in a room.');
+      room = global.ROOMS[user.current_room];
+      if (!room) throw new Error('User is not in a valid room.');
+    } catch ({ message }) {
+      user.comm(MSG.INFO, { message });
+    }
 
-    room.toggleReady(user);
+    room && room.toggleReady(user);
   });
 
   user.receive(MSG.ROOM.LEAVE, () => {
-    if (!user.current_room) throw new Error('User is not in a room.');
-    const room = global.ROOMS[user.current_room];
-    if (!room) {
-      user.current_room = null;
-      throw new Error('The room does not exist.');
+    let room;
+    try {
+      if (!user.current_room) throw new Error('User is not in a room.');
+      room = global.ROOMS[user.current_room];
+      if (!room) {
+        user.current_room = null;
+        throw new Error('The room does not exist.');
+      }
+    } catch ({ message }) {
+      user.comm(MSG.INFO, { message });
     }
 
-    room.leave(user);
+    room && room.leave(user);
   });
 
   user.receive(MSG.ROOM.SETTINGS.SEND, (settings) => {
-    if (!user.current_room) throw new Error('User is not in any room');
-    const room = global.ROOMS[user.current_room];
-    if (!room) throw new Error('User is not in a valid room');
+    let room;
+    try {
+      if (!user.current_room) throw new Error('User is not in any room');
+      room = global.ROOMS[user.current_room];
+      if (!room) throw new Error('User is not in a valid room');
+    } catch ({ message }) {
+      user.comm(MSG.INFO, { message });
+    }
 
-    room.setSettings(settings, user);
+    room && room.setSettings(settings, user);
   });
 
   user.receive(MSG.GAME.START, () => {
-    if (!user.current_room) throw new Error('User is not in any room');
-    const room = global.ROOMS[user.current_room];
-    if (!room) throw new Error('User is not in a valid room');
+    let room;
+    try {
+      if (!user.current_room) throw new Error('User is not in any room');
+      room = global.ROOMS[user.current_room];
+      if (!room) throw new Error('User is not in a valid room');
+    } catch ({ message }) {
+      user.comm(MSG.INFO, { message });
+    }
 
-    room.startGame(user);
+    room && room.startGame(user);
   });
 
   user.receive(MSG.GAME.VOTE, (id) => {
-    if (!user.current_room) throw new Error('User is not in any room');
-    const room = global.ROOMS[user.current_room];
-    if (!room) throw new Error('User is not in a valid room');
-    const game = room.game;
-    if (!game) throw new Error('User is not in a valid game');
+    let game;
+    try {
+      if (!user.current_room) throw new Error('User is not in any room');
+      const room = global.ROOMS[user.current_room];
+      if (!room) throw new Error('User is not in a valid room');
+      game = room.game;
+      if (!game) throw new Error('User is not in a valid game');
+    } catch ({ message }) {
+      user.comm(MSG.INFO, { message });
+    }
 
-    game.vote(user.id, id);
+    game && game.vote(user.id, id);
   });
 });
 

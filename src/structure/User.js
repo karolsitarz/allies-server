@@ -41,7 +41,6 @@ class User {
         callback(passed);
       } catch (e) {
         console.log(e.stack);
-        this.comm(MSG.INFO, { message: e.message });
       }
     });
   }
